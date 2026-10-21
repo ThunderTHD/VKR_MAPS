@@ -12,6 +12,7 @@ from app.models import (
     NetworkNode,
     OpticalCross,
     RouteSegment,
+    UnclassifiedFeature,
 )
 
 NODE_KIND_RU = {"well": "Колодец", "kks": "ККС", "pole": "Опора", "site": "Узел связи", "building": "Здание",
@@ -56,6 +57,8 @@ def node_card(db: Session, node_id: int) -> dict | None:
             ["Тип", NODE_KIND_RU[n.kind.value]], ["Код", n.code], ["Название", n.name],
             ["Владелец", n.owner.short_name if n.owner else None], ["Адрес", n.address], ["Примечание", n.note],
         ],
+        "edit": {"kind": n.kind.value, "code": n.code, "name": n.name, "owner_id": n.owner_id,
+                 "address": n.address, "note": n.note},
         "sections": [
             {"title": "Муфты", "items": [
                 _ref("closure", c.id, c.number)
@@ -92,7 +95,12 @@ def segment_card(db: Session, seg_id: int) -> dict | None:
             ["Тип", SEGMENT_KIND_RU[s.kind.value]], ["Владелец", s.owner.short_name if s.owner else None],
             ["Длина по карте", f"{s.geom_length_m:.1f} м"], ["Фактическая длина", fact],
             ["Каналов", s.channels_total],
+            ["Название в схеме", s.name], ["Длина уточнена", s.length_updated_at.strftime("%d.%m.%Y %H:%M")
+                                            if s.length_updated_at else None],
         ],
+        "edit": {"kind": s.kind.value, "owner_id": s.owner_id, "name": s.name, "fact_length_m": s.fact_length_m,
+                 "length_source": s.length_source.value if s.length_source else None,
+                 "length_note": s.length_note, "channels_total": s.channels_total},
         "sections": [
             {"title": "Концы", "items": [_ref("node", s.node_a_id, _node_label(s.node_a)),
                                          _ref("node", s.node_b_id, _node_label(s.node_b))]},
@@ -201,8 +209,24 @@ def access_node_card(db: Session, an_id: int) -> dict | None:
     }
 
 
-CARDS = {"node": node_card, "segment": segment_card, "cable": cable_card, "closure": closure_card,
-         "cross": cross_card, "access_node": access_node_card}
+def unclassified_card(db: Session, feat_id: int) -> dict | None:
+    u = db.get(UnclassifiedFeature, feat_id)
+    if u is None:
+        return None
+    gtype, length = db.execute(sa.text("SELECT GeometryType(geom), ST_Length(geom::geography) "
+                                       "FROM unclassified_feature WHERE id = :id"), {"id": u.id}).one()
+    return {
+        "type": "unclassified", "id": u.id, "title": u.name or "Без названия",
+        "subtitle": "Неклассифицированный объект", "geom_type": gtype,
+        "fields": [["Папка в файле", u.folder],
+                   ["Геометрия", {"POINT": "точка", "LINESTRING": "линия"}.get(gtype, gtype)],
+                   ["Длина", f"{length:.0f} м" if length else None], ["Импорт", f"№{u.import_job_id}"]],
+        "sections": [],
+    }
+
+
+CARDS = {"unclassified": unclassified_card, "node": node_card, "segment": segment_card, "cable": cable_card,
+         "closure": closure_card, "cross": cross_card, "access_node": access_node_card}
 
 
 SEARCH_SQL = r"""

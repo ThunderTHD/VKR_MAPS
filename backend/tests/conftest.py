@@ -6,13 +6,17 @@
 один раз за прогон.
 """
 import os
+import tempfile
 
-import pytest
-from alembic import command
-from alembic.config import Config
-from fastapi.testclient import TestClient
+# Загрузки тестов — во временный каталог (до импорта приложения: настройки кэшируются)
+os.environ.setdefault("UPLOAD_DIR", tempfile.mkdtemp(prefix="vols_test_uploads_"))
 
-from app.core.db import SessionLocal, engine
+import pytest  # noqa: E402
+from alembic import command  # noqa: E402
+from alembic.config import Config  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+from app.core.db import SessionLocal, engine  # noqa: E402
 
 BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 

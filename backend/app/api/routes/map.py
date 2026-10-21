@@ -14,7 +14,7 @@ from app.services.map_data import LAYERS, MapFilter, layer_geojson, network_exte
 router = APIRouter(tags=["Карта"], dependencies=[Depends(current_user)])
 
 LayerName = Literal["segments", "nodes", "cables", "closures", "access_nodes", "jumpers", "unclassified"]
-CardType = Literal["node", "segment", "cable", "closure", "cross", "access_node"]
+CardType = Literal["node", "segment", "cable", "closure", "cross", "access_node", "unclassified"]
 
 
 def _parse_bbox(bbox: str | None) -> tuple[float, float, float, float] | None:

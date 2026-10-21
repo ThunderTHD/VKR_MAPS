@@ -6,6 +6,7 @@
   create-user   создать пользователя
   demo-users    создать демонстрационных пользователей (admin, montazhnik, viewer)
   stats         показать, сколько объектов в базе
+  import-kml    импорт KML/KMZ (по умолчанию — только отчёт; --commit — записать)
 """
 import argparse
 import sys
@@ -61,6 +62,29 @@ def cmd_demo_users(_: argparse.Namespace) -> None:
         print("Демонстрационные пользователи уже есть")
 
 
+def cmd_import_kml(args: argparse.Namespace) -> None:
+    from app.services.kml import jobs
+
+    with SessionLocal() as db:
+        for path in args.files:
+            with open(path, "rb") as fh:
+                job = jobs.create_job(db, path.replace("\\", "/").rsplit("/", 1)[-1], fh.read(), None)
+            preview = jobs.build_preview(db, job, tolerance_m=args.tolerance)
+            print(f"\n{path}")
+            for key, value in preview["summary"].items():
+                print(f"  {key:<24} {value}")
+            for w in preview["warnings"]:
+                if w["level"] != "info" or args.verbose:
+                    print(f"  [{w['level']}] {w['message']}")
+            if args.commit:
+                created = jobs.commit_job(db, job, None)["created"]
+                db.commit()
+                print(f"  записано: {created}")
+            else:
+                db.rollback()
+                print("  (пробный прогон — добавьте --commit, чтобы записать)")
+
+
 def cmd_stats(_: argparse.Namespace) -> None:
     with SessionLocal() as db:
         for key, value in collect_stats(db).items():
@@ -85,6 +109,13 @@ def main(argv: list[str] | None = None) -> None:
 
     sub.add_parser("demo-users", help="создать демонстрационных пользователей").set_defaults(func=cmd_demo_users)
     sub.add_parser("stats", help="сколько объектов в базе").set_defaults(func=cmd_stats)
+
+    k = sub.add_parser("import-kml", help="импорт KML/KMZ")
+    k.add_argument("files", nargs="+")
+    k.add_argument("--commit", action="store_true", help="записать в базу (иначе только отчёт)")
+    k.add_argument("--tolerance", type=float, default=10.0, help="допуск привязки концов, м")
+    k.add_argument("-v", "--verbose", action="store_true", help="показывать и информационные сообщения")
+    k.set_defaults(func=cmd_import_kml)
 
     args = parser.parse_args(argv)
     args.func(args)

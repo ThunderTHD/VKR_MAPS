@@ -94,8 +94,8 @@ export class MapLayers {
       renderer: this.renderers.segments,
       style: { color: "#fb8500", weight: 2, dashArray: "3 5" },
       pointToLayer: (f, ll) => L.circleMarker(ll, { radius: 4, color: "#fb8500", renderer: this.renderers.segments }),
-      onEachFeature: (f, l) => l.bindTooltip(
-        `${f.properties.name || "Без названия"}<br><small>${f.properties.folder || ""}</small>`, { sticky: true }),
+      onEachFeature: (f, l) => this.bind(l, "unclassified", f,
+        `${f.properties.name || "Без названия"}<br><small>${f.properties.folder || ""}</small>`),
     });
   }
 
@@ -120,7 +120,9 @@ export class MapLayers {
   }
 
   bind(layer, type, feature, tooltip) {
-    if (tooltip) layer.bindTooltip(tooltip, { sticky: type === "segment" || type === "cable", direction: "top" });
+    if (tooltip) {
+      layer.bindTooltip(tooltip, { sticky: ["segment", "cable", "unclassified"].includes(type), direction: "top" });
+    }
     layer.on("click", (e) => {
       L.DomEvent.stopPropagation(e);
       this.onSelect(type, feature.properties.id);
@@ -156,7 +158,7 @@ export class MapLayers {
   highlightObject(type, id) {
     this.highlight.clearLayers();
     const source = { segment: "segments", cable: "cables", node: "nodes", closure: "closures",
-      access_node: "access_nodes" }[type];
+      access_node: "access_nodes", unclassified: "unclassified" }[type];
     const feature = source && this.data[source]?.features.find((f) => f.properties.id === id);
     if (!feature) return null;
     const shape = L.geoJSON(feature, {

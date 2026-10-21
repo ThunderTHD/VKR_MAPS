@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Импорт KML — ГИС ВОЛС</title>
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body class="import-page">
+  <aside class="import-side">
+    <header class="import-head">
+      <a href="/" class="brand" title="К карте"><span class="brand-mark" aria-hidden="true"></span>ГИС ВОЛС</a>
+      <h1>Импорт KML</h1>
+    </header>
+
+    <!-- Шаг 1. Файл -->
+    <section id="step-file" class="step">
+      <label id="drop" class="drop">
+        <input id="file" type="file" accept=".kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz">
+        <strong>Выберите файл KML или KMZ</strong>
+        <span class="muted">или перетащите его сюда. Выгрузка из Google Earth подойдёт как есть.</span>
+      </label>
+      <p id="upload-status" class="muted" hidden></p>
+      <h2>Последние импорты</h2>
+      <ul id="jobs" class="jobs"></ul>
+    </section>
+
+    <!-- Шаг 2. Сопоставление и предпросмотр -->
+    <section id="step-preview" class="step" hidden>
+      <div class="file-line"><span id="file-name"></span>
+        <button id="btn-cancel" class="btn btn-small" type="button">Другой файл</button></div>
+
+      <h2>Папки файла</h2>
+      <p class="muted small">Что означает каждая папка. Выбор запоминается для следующих файлов.</p>
+      <div class="table-scroll"><table class="data-table folders">
+        <thead><tr><th>Папка</th><th>Объекты</th><th>Что это</th><th>Тип</th><th>Владелец</th></tr></thead>
+        <tbody id="folders"></tbody>
+      </table></div>
+      <label class="field inline">Допуск привязки концов, м
+        <input id="tolerance" type="number" min="0.5" max="200" step="0.5" value="10">
+      </label>
+      <button id="btn-refresh" class="btn" type="button">Обновить предпросмотр</button>
+
+      <h2>Что будет сделано</h2>
+      <div id="summary" class="summary"></div>
+
+      <h2>Замечания <span id="warn-count" class="muted"></span></h2>
+      <label class="toggle small"><input id="show-info" type="checkbox"> показывать информационные</label>
+      <ul id="warnings" class="warnings"></ul>
+
+      <div class="sticky-actions">
+        <button id="btn-commit" class="btn btn-primary" type="button">Записать в базу</button>
+      </div>
+    </section>
+
+    <!-- Шаг 3. Готово -->
+    <section id="step-done" class="step" hidden>
+      <h2>Импорт записан</h2>
+      <div id="done-summary" class="summary"></div>
+      <p><a class="btn btn-primary" href="/">Открыть на карте</a>
+        <button id="btn-again" class="btn" type="button">Импортировать ещё</button></p>
+    </section>
+  </aside>
+
+  <main class="import-map">
+    <div id="map" aria-label="Предпросмотр импорта"></div>
+    <div class="map-legend">
+      <span><i class="lg lg-new"></i>новый участок</span>
+      <span><i class="lg lg-warning"></i>с замечанием</span>
+      <span><i class="lg lg-duplicate"></i>уже есть в базе</span>
+      <span><i class="lg lg-unclassified"></i>неклассифицированный</span>
+      <span><i class="dot dot-new"></i>новая точка из файла</span>
+      <span><i class="dot dot-auto"></i>создана в конце линии</span>
+    </div>
+  </main>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script type="module" src="js/import.js"></script>
+</body>
+</html>

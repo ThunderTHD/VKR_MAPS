@@ -1,6 +1,7 @@
 // Главный модуль карты: загрузка справочников и слоёв, фильтры, поиск, карточки, состояние в адресе.
 import { api } from "./api.js";
 import { renderCard } from "./card.js";
+import { Editor } from "./edit.js";
 import { LAYER_INFO, MapLayers } from "./layers.js";
 
 const $ = (id) => document.getElementById(id);
@@ -20,6 +21,7 @@ L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
 map.setView([55.74, 52.4], 12); // Набережные Челны — до загрузки границ сети
 
 let layers;
+let editor;
 
 // ---------- Состояние в адресной строке: #op=1&owner=2&obj=cable:5 ----------
 
@@ -63,7 +65,7 @@ async function openObject(type, id, { fly = true } = {}) {
   card.classList.remove("expanded");
   try {
     const data = await api(`/api/objects/${type}/${id}`);
-    renderCard(card, data, (t, i) => openObject(t, i));
+    renderCard(card, data, (t, i) => openObject(t, i), editor.actions(data));
     const bounds = layers.highlightObject(type, id);
     if (fly) {
       if (bounds && bounds.isValid()) {
@@ -223,6 +225,7 @@ function togglePanel(id, btn) {
 function setupUi(user) {
   $("user-name").textContent = `${user.full_name} (${{ admin: "администратор", installer: "монтажник",
     viewer: "просмотр" }[user.role]})`;
+  if (user.role === "admin") $("menu-import").hidden = false;
   $("btn-user").addEventListener("click", () => togglePanel("user-menu", $("btn-user")));
   $("btn-logout").addEventListener("click", async () => {
     await api("/api/auth/logout", { method: "POST" });
@@ -264,7 +267,14 @@ function setupUi(user) {
 async function main() {
   const user = await api("/api/auth/me");
   const ref = await api("/api/map/reference");
-  layers = new MapLayers(map, ref, (type, id) => openObject(type, id, { fly: false }));
+  layers = new MapLayers(map, ref, (type, id) => {
+    if (!editor.interceptSelect(type, id)) openObject(type, id, { fly: false });
+  });
+  editor = new Editor({
+    user, ref, map, layers, toast, closeCard,
+    reload: loadLayers,
+    reopen: (type, id) => openObject(type, id, { fly: false }),
+  });
   fillSelect($("filter-operator"), ref.operators);
   fillSelect($("filter-owner"), ref.owners);
   legend($("legend-owners"), ref.owners, "line");

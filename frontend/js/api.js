@@ -15,18 +15,23 @@ export async function api(path, { method = "GET", body, params } = {}) {
     }
   }
   const headers = { "X-Requested-With": "fetch" }; // защита от CSRF (см. app/core/auth.py)
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+  const isForm = body instanceof FormData; // загрузка файла: заголовок с границей ставит браузер
+  if (body !== undefined && !isForm) headers["Content-Type"] = "application/json";
   const r = await fetch(url, {
     method,
     headers,
     credentials: "same-origin",
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
   });
   if (r.status === 401 && !path.startsWith("/api/auth/login")) {
     location.href = "/login.html?next=" + encodeURIComponent(location.pathname + location.hash);
     throw new ApiError(401, "Требуется вход");
   }
   const data = r.headers.get("content-type")?.includes("json") ? await r.json() : await r.text();
-  if (!r.ok) throw new ApiError(r.status, data?.detail || r.statusText);
+  if (!r.ok) {
+    // FastAPI отдаёт ошибки проверки данных списком — показываем первую понятную строку
+    const detail = Array.isArray(data?.detail) ? data.detail.map((d) => d.msg).join("; ") : data?.detail;
+    throw new ApiError(r.status, detail || r.statusText);
+  }
   return data;
 }

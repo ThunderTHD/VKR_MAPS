@@ -2,7 +2,7 @@
 
 const TYPE_RU = {
   node: "Узел", segment: "Участок трассы", cable: "Кабель", closure: "Муфта", cross: "Кросс",
-  access_node: "Узел доступа",
+  access_node: "Узел доступа", unclassified: "Неклассифицированный",
 };
 
 function el(tag, attrs = {}, ...children) {
@@ -23,12 +23,14 @@ function el(tag, attrs = {}, ...children) {
  * @param {HTMLElement} root — элемент #card
  * @param {object} data — ответ /api/objects/{type}/{id}
  * @param {(type, id) => void} onOpen — открыть связанный объект
+ * @param {HTMLElement|null} actions — кнопки действий (по правам пользователя)
  */
-export function renderCard(root, data, onOpen) {
+export function renderCard(root, data, onOpen, actions = null) {
   root.querySelector("#card-title").textContent = data.title;
   root.querySelector("#card-subtitle").textContent = data.subtitle || TYPE_RU[data.type] || "";
   const body = root.querySelector("#card-body");
   body.replaceChildren();
+  if (actions) body.append(actions);
 
   const fields = data.fields.filter(([, v]) => v !== null && v !== undefined && v !== "");
   if (fields.length) {
