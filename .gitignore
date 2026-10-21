@@ -1,0 +1,29 @@
+# Окружение и секреты
+.env
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+
+# Загрузки и локальные данные — реальные схемы сетей в репозиторий не попадают
+data/uploads/
+data/real/
+*.kml
+*.kmz
+!data/samples/**/*.kml
+*.pdf
+!data/samples/**/*.pdf
+
+# Редакторы и ОС
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

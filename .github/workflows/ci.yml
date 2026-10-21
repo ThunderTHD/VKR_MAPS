@@ -1,0 +1,40 @@
+# Непрерывная интеграция: на каждый push проверяем стиль кода и прогоняем тесты
+# на настоящем PostgreSQL + PostGIS (как в docker-compose).
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: vols_test
+          POSTGRES_USER: vols
+          POSTGRES_PASSWORD: vols
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U vols -d vols_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgresql+psycopg://vols:vols@localhost:5432/vols_test
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Системные пакеты (OCR)
+        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr tesseract-ocr-rus
+      - name: Зависимости
+        run: pip install ".[dev]"
+      - name: Линтер
+        run: ruff check .
+      - name: Тесты
+        run: pytest --cov=app --cov-report=term-missing

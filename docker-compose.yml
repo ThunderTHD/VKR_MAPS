@@ -1,0 +1,44 @@
+# Запуск всей системы одной командой:  docker compose up -d --build
+# После запуска: http://localhost:8000  (документация API — /api/docs)
+name: vols-gis
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-vols}
+      POSTGRES_USER: ${POSTGRES_USER:-vols}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vols}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      # Наружу только на localhost — чтобы подключаться к базе из DBeaver/pgAdmin
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-vols}:${POSTGRES_PASSWORD:-vols}@db:5432/${POSTGRES_DB:-vols}
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      ENVIRONMENT: ${ENVIRONMENT:-dev}
+      MONITORING_MODE: ${MONITORING_MODE:-simulate}
+    volumes:
+      - uploads:/data/uploads
+    ports:
+      - "${APP_PORT:-8000}:8000"
+
+volumes:
+  pgdata:
+  uploads:

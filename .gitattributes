@@ -1,0 +1,9 @@
+# На Windows git по умолчанию меняет переводы строк на CRLF.
+# Скрипты, которые выполняются внутри Linux-контейнера, с CRLF не запустятся,
+# поэтому храним и извлекаем все текстовые файлы с LF.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.png binary
+*.jpg binary
+*.pdf binary
