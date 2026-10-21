@@ -65,7 +65,7 @@ docker compose up -d --build
 |---|---|
 | http://localhost:8000 | приложение |
 | http://localhost:8000/api/docs | документация API (Swagger) |
-| `localhost:5432`, база `vols`, пользователь/пароль `vols` | база для DBeaver / pgAdmin |
+| `localhost:5433`, база `vols`, пользователь/пароль `vols` | база для DBeaver / pgAdmin |
 
 ### Если что-то не так
 

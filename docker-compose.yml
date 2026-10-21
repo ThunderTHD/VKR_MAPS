@@ -13,8 +13,9 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      # Наружу только на localhost — чтобы подключаться к базе из DBeaver/pgAdmin
-      - "127.0.0.1:${DB_PORT:-5432}:5432"
+      # Наружу только на localhost — чтобы подключаться к базе из DBeaver/pgAdmin.
+      # 5433, а не стандартный 5432: на рабочем ноутбуке 5432 часто занят своим PostgreSQL.
+      - "127.0.0.1:${DB_HOST_PORT:-5433}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
