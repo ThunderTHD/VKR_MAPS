@@ -33,7 +33,7 @@ jobs:
       - name: Системные пакеты (OCR)
         run: sudo apt-get update && sudo apt-get install -y tesseract-ocr tesseract-ocr-rus
       - name: Зависимости
-        run: pip install ".[dev]"
+        run: pip install -e ".[dev]"  # из исходников: приложение видит ../frontend
       - name: Линтер
         run: ruff check .
       - name: Тесты
