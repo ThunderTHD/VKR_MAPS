@@ -3,11 +3,12 @@
 Одно приложение отдаёт и REST API (/api/...), и статический фронтенд (/).
 Документация API генерируется автоматически: /api/docs (Swagger UI).
 """
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app import __version__
-from app.api.routes import health, stats
+from app.api.routes import auth, health, map, stats
+from app.core.auth import current_user
 from app.core.config import get_settings
 
 
@@ -22,8 +23,10 @@ def create_app() -> FastAPI:
         redoc_url=None,
         openapi_url="/api/openapi.json",
     )
-    app.include_router(health.router, prefix="/api")
-    app.include_router(stats.router, prefix="/api")
+    app.include_router(health.router, prefix="/api")          # открыт: проверка работоспособности
+    app.include_router(auth.router, prefix="/api")
+    app.include_router(stats.router, prefix="/api", dependencies=[Depends(current_user)])
+    app.include_router(map.router, prefix="/api")
 
     # Статику подключаем последней: маршрут "/" не должен перекрывать /api
     if s.frontend_dir.is_dir():

@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://vols:vols@localhost:5432/vols"
 
     # Секрет для подписи токенов авторизации. В продакшене обязательно заменить.
-    secret_key: str = "change-me-in-production"
+    secret_key: str = "dev-only-secret-change-me-on-server-0123456789"  # ≥ 32 байт для HS256
     access_token_minutes: int = 12 * 60
 
     # Каталог для загруженных файлов (фото, документы, пакеты ИД)

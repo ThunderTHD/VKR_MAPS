@@ -1,4 +1,5 @@
 // Служебная страница: состояние API/базы и сводка по объектам сети.
+import { api } from "./api.js";
 
 const LABELS = {
   status: "Состояние",
@@ -37,7 +38,7 @@ async function loadHealth() {
 async function loadStats() {
   const box = document.getElementById("stats");
   try {
-    const data = await (await fetch("/api/stats")).json();
+    const data = await api("/api/stats");
     const fmt = new Intl.NumberFormat("ru-RU");
     fill(box, Object.entries(data).map(([label, value]) => [label, fmt.format(value)]));
   } catch {

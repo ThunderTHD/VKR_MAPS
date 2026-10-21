@@ -3,20 +3,86 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#14213d">
   <title>ГИС ВОЛС</title>
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="css/app.css">
 </head>
-<body>
-  <!-- Этапы 1–2: служебная страница. Карта появится на этапе 3. -->
-  <main class="stub">
-    <h1>ГИС ВОЛС</h1>
-    <p>Учёт волоконно-оптических линий связи и локализация повреждений.</p>
-    <h2>Система</h2>
-    <dl id="status" class="status"><dt>Состояние</dt><dd>проверяю…</dd></dl>
-    <h2>Данные</h2>
-    <dl id="stats" class="status"><dt>Загрузка</dt><dd>…</dd></dl>
-    <p><a href="/api/docs">Документация API</a></p>
-  </main>
-  <script type="module" src="js/health.js"></script>
+<body class="map-page">
+  <div id="map" aria-label="Карта сети"></div>
+
+  <!-- Верхняя панель: поиск, фильтры, слои, пользователь -->
+  <header class="topbar">
+    <div class="brand" title="ГИС ВОЛС"><span class="brand-mark" aria-hidden="true"></span><span class="brand-text">ГИС ВОЛС</span></div>
+    <div class="search">
+      <input id="search" type="search" placeholder="Колодец, муфта, кабель, адрес, IP…" autocomplete="off"
+             aria-label="Поиск по сети">
+      <ul id="search-results" class="search-results" role="listbox" hidden></ul>
+    </div>
+    <button id="btn-layers" class="icon-btn" title="Слои и фильтры" aria-label="Слои и фильтры" aria-expanded="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 8l10 5 10-5-10-5Zm-8.2 9L2 13l10 5 10-5-1.8-1L12 16l-8.2-4Zm0 4L2 17l10 5 10-5-1.8-1L12 20l-8.2-4Z"/></svg>
+    </button>
+    <div class="user">
+      <button id="btn-user" class="icon-btn" aria-label="Пользователь" aria-expanded="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-5 0-9 2.5-9 5.5V22h18v-2.5C21 16.5 17 14 12 14Z"/></svg>
+      </button>
+      <div id="user-menu" class="menu" hidden>
+        <div id="user-name" class="menu-title"></div>
+        <a href="/status.html">Состояние системы</a>
+        <a href="/api/docs" target="_blank" rel="noopener">Документация API</a>
+        <button id="btn-logout" type="button">Выйти</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Активный фильтр — плашка под панелью -->
+  <div id="filter-chip" class="filter-chip" hidden>
+    <span id="filter-chip-text"></span>
+    <button id="filter-chip-clear" aria-label="Сбросить фильтры">✕</button>
+  </div>
+
+  <!-- Панель слоёв и фильтров -->
+  <aside id="layers-panel" class="panel layers-panel" hidden>
+    <div class="panel-head">
+      <h2>Слои и фильтры</h2>
+      <button class="icon-btn small" data-close="layers-panel" aria-label="Закрыть">✕</button>
+    </div>
+    <div class="panel-body">
+      <label class="field">Оператор
+        <select id="filter-operator"><option value="">Все операторы</option></select>
+      </label>
+      <label class="field">Владелец инфраструктуры
+        <select id="filter-owner"><option value="">Все владельцы</option></select>
+      </label>
+      <h3>Слои</h3>
+      <div id="layer-toggles" class="toggles"></div>
+      <h3>Владельцы трасс</h3>
+      <ul id="legend-owners" class="legend"></ul>
+      <h3>Кабели операторов</h3>
+      <ul id="legend-operators" class="legend"></ul>
+    </div>
+  </aside>
+
+  <!-- Карточка объекта: справа на ПК, шторка снизу на телефоне -->
+  <aside id="card" class="panel card" hidden aria-live="polite">
+    <button class="sheet-handle" id="sheet-handle" aria-label="Развернуть карточку"></button>
+    <div class="panel-head">
+      <div>
+        <div id="card-subtitle" class="card-subtitle"></div>
+        <h2 id="card-title"></h2>
+      </div>
+      <button class="icon-btn small" data-close="card" aria-label="Закрыть">✕</button>
+    </div>
+    <div id="card-body" class="panel-body"></div>
+  </aside>
+
+  <button id="btn-locate" class="fab" title="Моё местоположение" aria-label="Моё местоположение">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm9 3h-2.06A7 7 0 0 0 13 5.06V3h-2v2.06A7 7 0 0 0 5.06 11H3v2h2.06A7 7 0 0 0 11 18.94V21h2v-2.06A7 7 0 0 0 18.94 13H21v-2Zm-9 6a5 5 0 1 1 0-10 5 5 0 0 1 0 10Z"/></svg>
+  </button>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script type="module" src="js/app.js"></script>
 </body>
 </html>

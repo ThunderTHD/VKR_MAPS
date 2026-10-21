@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Вход — ГИС ВОЛС</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body class="login-page">
+  <form id="login" class="login-card" autocomplete="on">
+    <div class="brand"><span class="brand-mark" aria-hidden="true"></span>ГИС ВОЛС</div>
+    <p class="muted">Учёт волоконно-оптических линий связи</p>
+    <label>Логин
+      <input name="login" autocomplete="username" required autofocus>
+    </label>
+    <label>Пароль
+      <input name="password" type="password" autocomplete="current-password" required>
+    </label>
+    <p id="error" class="form-error" role="alert" hidden></p>
+    <button type="submit" class="btn btn-primary">Войти</button>
+  </form>
+  <script type="module" src="js/login.js"></script>
+</body>
+</html>

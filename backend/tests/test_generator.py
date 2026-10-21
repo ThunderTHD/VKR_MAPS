@@ -109,6 +109,5 @@ def test_password_hashing():
     assert not verify_password("x", "мусор")
 
 
-def test_stats_endpoint(client):
-    body = client.get("/api/stats").json()
-    assert "Узлы сети" in body and "Волокна" in body
+def test_stats_endpoint_requires_login(client):
+    assert client.get("/api/stats").status_code == 401
