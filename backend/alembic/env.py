@@ -2,11 +2,13 @@
 from logging.config import fileConfig
 
 from alembic import context
+from geoalchemy2 import alembic_helpers
 from sqlalchemy import engine_from_config, pool
 
 from app import models  # noqa: F401 — регистрирует все модели в Base.metadata
 from app.core.config import get_settings
 from app.core.db import Base
+from app.core.migrations import include_object
 
 config = context.config
 if config.config_file_name is not None:
@@ -15,17 +17,16 @@ config.set_main_option("sqlalchemy.url", get_settings().database_url)
 
 target_metadata = Base.metadata
 
-# Таблицы, которые создаёт само расширение PostGIS: Alembic не должен пытаться их удалить
-POSTGIS_TABLES = {"spatial_ref_sys"}
-
-
-def include_object(obj, name, type_, reflected, compare_to):
-    return not (type_ == "table" and name in POSTGIS_TABLES)
+# Помощники GeoAlchemy2: корректно создают таблицы с геометрией и их GiST-индексы
+GEO_OPTS = {
+    "process_revision_directives": alembic_helpers.writer,
+    "render_item": alembic_helpers.render_item,
+}
 
 
 def run_migrations_offline() -> None:
     context.configure(url=config.get_main_option("sqlalchemy.url"), target_metadata=target_metadata,
-                      literal_binds=True, include_object=include_object)
+                      literal_binds=True, include_object=include_object, **GEO_OPTS)
     with context.begin_transaction():
         context.run_migrations()
 
@@ -35,7 +36,7 @@ def run_migrations_online() -> None:
                                      prefix="sqlalchemy.", poolclass=pool.NullPool)
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata,
-                          include_object=include_object, compare_type=True)
+                          include_object=include_object, compare_type=True, **GEO_OPTS)
         with context.begin_transaction():
             context.run_migrations()
 

@@ -1,5 +1,4 @@
-// Этап 1: запрашиваем /api/health и показываем, что API, база и PostGIS работают.
-const box = document.getElementById("status");
+// Служебная страница: состояние API/базы и сводка по объектам сети.
 
 const LABELS = {
   status: "Состояние",
@@ -10,25 +9,41 @@ const LABELS = {
   error: "Ошибка",
 };
 
-async function load() {
+function fill(box, pairs) {
+  box.replaceChildren(
+    ...pairs.flatMap(([label, value, cls]) => {
+      const dt = document.createElement("dt");
+      dt.textContent = label;
+      const dd = document.createElement("dd");
+      dd.textContent = value;
+      if (cls) dd.className = cls;
+      return [dt, dd];
+    }),
+  );
+}
+
+async function loadHealth() {
+  const box = document.getElementById("status");
   try {
-    const r = await fetch("/api/health");
-    const data = await r.json();
-    box.replaceChildren(
-      ...Object.entries(LABELS)
-        .filter(([key]) => key in data)
-        .flatMap(([key, label]) => {
-          const dt = document.createElement("dt");
-          dt.textContent = label;
-          const dd = document.createElement("dd");
-          dd.textContent = data[key];
-          if (key === "status") dd.className = data[key] === "ok" ? "ok" : "bad";
-          return [dt, dd];
-        }),
-    );
-  } catch (e) {
-    box.innerHTML = "<dt>Состояние</dt><dd class='bad'>API недоступно</dd>";
+    const data = await (await fetch("/api/health")).json();
+    fill(box, Object.entries(LABELS)
+      .filter(([key]) => key in data)
+      .map(([key, label]) => [label, data[key], key === "status" ? (data[key] === "ok" ? "ok" : "bad") : ""]));
+  } catch {
+    fill(box, [["Состояние", "API недоступно", "bad"]]);
   }
 }
 
-load();
+async function loadStats() {
+  const box = document.getElementById("stats");
+  try {
+    const data = await (await fetch("/api/stats")).json();
+    const fmt = new Intl.NumberFormat("ru-RU");
+    fill(box, Object.entries(data).map(([label, value]) => [label, fmt.format(value)]));
+  } catch {
+    fill(box, [["Сводка", "недоступна", "bad"]]);
+  }
+}
+
+loadHealth();
+loadStats();

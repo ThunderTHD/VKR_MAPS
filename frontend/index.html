@@ -7,11 +7,14 @@
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
-  <!-- Этап 1: страница-заглушка. Карта появится на этапе 3. -->
+  <!-- Этапы 1–2: служебная страница. Карта появится на этапе 3. -->
   <main class="stub">
     <h1>ГИС ВОЛС</h1>
     <p>Учёт волоконно-оптических линий связи и локализация повреждений.</p>
+    <h2>Система</h2>
     <dl id="status" class="status"><dt>Состояние</dt><dd>проверяю…</dd></dl>
+    <h2>Данные</h2>
+    <dl id="stats" class="status"><dt>Загрузка</dt><dd>…</dd></dl>
     <p><a href="/api/docs">Документация API</a></p>
   </main>
   <script type="module" src="js/health.js"></script>

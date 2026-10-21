@@ -51,3 +51,10 @@ body {
 .status dd { margin: 0; }
 .ok { color: var(--ok); font-weight: 600; }
 .bad { color: var(--bad); font-weight: 600; }
+
+.stub h2 {
+  margin: 24px 0 8px;
+  font-size: 15px;
+  color: var(--muted);
+  font-weight: 600;
+}
