@@ -26,8 +26,8 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: Системные пакеты (OCR)
@@ -37,4 +37,12 @@ jobs:
       - name: Линтер
         run: ruff check .
       - name: Тесты
-        run: pytest --cov=app --cov-report=term-missing
+        shell: bash
+        run: |
+          set +e
+          pytest --cov=app --cov-report=term-missing -rfE --tb=short 2>&1 | tee pytest.log
+          status=${PIPESTATUS[0]}
+          # Краткие причины падений — в аннотации (видны на странице прогона и через API)
+          grep -E "^(FAILED|ERROR) " pytest.log | head -20 | while read -r line; do echo "::error title=pytest::$line"; done
+          grep -E "^E  " pytest.log | head -20 | while read -r line; do echo "::error title=detail::$line"; done
+          exit $status
