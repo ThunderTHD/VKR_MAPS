@@ -62,6 +62,11 @@ target-version = "py312"
 select = ["E", "F", "W", "I", "B", "UP", "SIM"]
 ignore = ["B008"]  # Depends(...) в аргументах по умолчанию — штатный приём FastAPI
 
+[tool.ruff.lint.isort]
+# Папка alembic/ с миграциями — не наш пакет: импорт `alembic` — это библиотека
+known-third-party = ["alembic"]
+known-first-party = ["app"]
+
 [tool.ruff.lint.per-file-ignores]
 # В автогенерируемых миграциях импорты нужны «на всякий случай», а строки бывают длинными
 "alembic/versions/*" = ["F401", "E501"]
