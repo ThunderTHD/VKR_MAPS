@@ -100,6 +100,19 @@ def cmd_clear_generated(args: argparse.Namespace) -> None:
               f"участков {result['kept_segments']}")
 
 
+def cmd_localize_experiment(args: argparse.Namespace) -> None:
+    """Точность локализации на сгенерированной сети: случайные повреждения, сравнение с истиной."""
+    from app.services import experiment
+
+    with SessionLocal() as db:
+        res = experiment.run_experiment(db, n=args.n, seed=args.seed)
+    print(f"Повреждений смоделировано: {res['trials']} на {res['paths']} трактах")
+    print(f"Ошибка, м: средняя {res['error_mean_m']}, медиана {res['error_median_m']}, "
+          f"90 % — не больше {res['error_p90_m']}, максимум {res['error_max_m']}")
+    print(f"Средняя полуширина интервала: {res['half_width_mean_m']} м")
+    print(experiment.sigma_check(res))
+
+
 def cmd_stats(_: argparse.Namespace) -> None:
     with SessionLocal() as db:
         for key, value in collect_stats(db).items():
@@ -126,6 +139,11 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("stats", help="сколько объектов в базе").set_defaults(func=cmd_stats)
 
     sub.add_parser("clear-generated", help="удалить тестовую сеть генератора").set_defaults(func=cmd_clear_generated)
+
+    e = sub.add_parser("localize-experiment", help="точность локализации на сгенерированной сети")
+    e.add_argument("--n", type=int, default=300, help="сколько повреждений смоделировать")
+    e.add_argument("--seed", type=int, default=1)
+    e.set_defaults(func=cmd_localize_experiment)
 
     k = sub.add_parser("import-kml", help="импорт KML/KMZ")
     k.add_argument("files", nargs="+")

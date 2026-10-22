@@ -78,16 +78,20 @@
   </aside>
 
   <!-- Инструменты рисования (только администратор) -->
-  <nav id="draw-tools" class="draw-tools" aria-label="Рисование" hidden>
-    <button type="button" class="tool-btn" data-tool="point" title="Новая точка: колодец, опора, здание">
+  <nav id="draw-tools" class="draw-tools" aria-label="Инструменты">
+    <button type="button" class="tool-btn" data-tool="locate" title="Найти место повреждения по рефлектометру">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 1 21h22L12 2Zm0 5.5L19.5 19h-15L12 7.5ZM11 10v5h2v-5h-2Zm0 6v2h2v-2h-2Z"/></svg>
+      <span>Повреждение</span>
+    </button>
+    <button type="button" class="tool-btn admin-tool" data-tool="point" hidden title="Новая точка: колодец, опора, здание">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" stroke-width="2"/></svg>
       <span>Точка</span>
     </button>
-    <button type="button" class="tool-btn" data-tool="route" title="Участки трассы между колодцами">
+    <button type="button" class="tool-btn admin-tool" data-tool="route" hidden title="Участки трассы между колодцами">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19 10 9l5 6 4-10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="5" r="2.5"/></svg>
       <span>Трасса</span>
     </button>
-    <button type="button" class="tool-btn" data-tool="cable" title="Проложить кабель по существующим трассам">
+    <button type="button" class="tool-btn admin-tool" data-tool="cable" hidden title="Проложить кабель по существующим трассам">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17c4 0 4-10 9-10s5 10 9 10" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
       <span>Кабель</span>
     </button>
@@ -97,6 +101,14 @@
     <div class="panel-head">
       <h2></h2>
       <button class="icon-btn small" data-close="draw-panel" aria-label="Закончить рисование">✕</button>
+    </div>
+    <div class="panel-body"></div>
+  </aside>
+
+  <aside id="locate-panel" class="panel draw-panel locate-panel" hidden aria-live="polite">
+    <div class="panel-head">
+      <h2>Поиск повреждения</h2>
+      <button class="icon-btn small" data-close="locate-panel" aria-label="Закрыть">✕</button>
     </div>
     <div class="panel-body"></div>
   </aside>

@@ -44,10 +44,12 @@ export class DrawTools {
     this.panel = document.getElementById("draw-panel");
     this.rail = document.getElementById("draw-tools");
 
+    // Кнопки рисования — только администратору; «Повреждение» обслуживает LocateTool
     if (ctx.user.role === "admin") {
-      this.rail.hidden = false;
-      this.rail.querySelectorAll("[data-tool]").forEach((b) =>
-        b.addEventListener("click", () => this.start(b.dataset.tool)));
+      this.rail.querySelectorAll(".admin-tool").forEach((b) => {
+        b.hidden = false;
+        b.addEventListener("click", () => this.start(b.dataset.tool));
+      });
     }
     this.panel.querySelector("[data-close]")?.addEventListener("click", () => this.stop());
     this.map.on("click", (e) => this.mode && this._onClick(e));
@@ -66,9 +68,10 @@ export class DrawTools {
     this.points = [];
     this.ctx.closeCard();
     document.getElementById("layers-panel").hidden = true;
+    document.querySelector("#locate-panel [data-close]")?.click();
     document.body.classList.add("drawing", "no-hit");
     this.map.doubleClickZoom.disable();
-    this.rail.querySelectorAll("[data-tool]").forEach((b) => b.classList.toggle("active", b.dataset.tool === mode));
+    this.rail.querySelectorAll(".admin-tool").forEach((b) => b.classList.toggle("active", b.dataset.tool === mode));
     ({ point: () => this._pointPanel(), route: () => this._routePanel(), cable: () => this._cablePanel(),
       reshape: () => this._reshapeStart(), split: () => this._splitPanel() })[mode]();
     if (!this.mode) return; // режим не смог начаться (например, участок не загружен)
@@ -88,7 +91,7 @@ export class DrawTools {
     this.panel.hidden = true;
     document.body.classList.remove("drawing", "no-hit");
     this.map.doubleClickZoom.enable();
-    this.rail.querySelectorAll("[data-tool]").forEach((b) => b.classList.remove("active"));
+    this.rail.querySelectorAll(".admin-tool").forEach((b) => b.classList.remove("active"));
     if (!silent && reopen && back) this.ctx.openObject(back.type, back.id);
   }
 

@@ -90,6 +90,9 @@ export class Editor {
         btn("Удалить", () => this.deleteSegment(card), "btn-danger");
       }
     }
+    if (card.type === "cable") {
+      btn("Найти повреждение", () => this.ctx.locate.open({ cable: { id: card.id, name: card.title } }));
+    }
     if (card.type === "cable" && this.isAdmin) {
       btn("Изменить", () => this.cableForm(card));
       btn("Перепроложить", () => this.ctx.draw.reroute(card));
@@ -103,6 +106,7 @@ export class Editor {
       }
     }
     if (card.type === "cross") {
+      btn("Найти повреждение", () => this.ctx.locate.open({ cross: { id: card.id, label: card.title } }));
       if (this.isAdmin || this.isInstaller) btn("Подключить волокна", () => this.portsForm(card));
       if (this.isAdmin) {
         btn("Изменить", () => this.crossForm(card, card));
