@@ -13,6 +13,8 @@ if errorlevel 1 (
   exit /b 1
 )
 docker compose exec -T app python -m app.cli demo-users
+echo Моделирую устранённые повреждения (для журнала и калибровки)...
+docker compose exec -T app python -m app.cli simulate-incidents --n 40
 echo.
 echo Готово. Откройте http://localhost:8000
 pause
