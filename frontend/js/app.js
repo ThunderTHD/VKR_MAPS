@@ -13,6 +13,9 @@ const PREFS_KEY = "vols.layers";
 // ---------- Карта ----------
 
 const map = L.map("map", { zoomControl: false, preferCanvas: true, minZoom: 5, maxZoom: 20 });
+// Подпись Leaflet по умолчанию содержит флаг — убираем её, оставляя обязательную ссылку на OpenStreetMap
+// (лицензия ODbL требует указывать источник картографических данных).
+map.attributionControl.setPrefix(false);
 L.control.zoom({ position: "bottomright" }).addTo(map);
 L.control.scale({ imperial: false, position: "bottomleft" }).addTo(map);
 L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {

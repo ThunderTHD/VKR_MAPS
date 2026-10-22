@@ -16,6 +16,9 @@ const STATUS_RU = { new: "новый", warning: "с замечанием", dupli
 // ---------- Карта предпросмотра ----------
 
 const map = L.map("map", { zoomControl: true }).setView([55.74, 52.4], 12);
+// Подпись Leaflet по умолчанию содержит флаг — убираем её, оставляя обязательную ссылку на OpenStreetMap
+// (лицензия ODbL требует указывать источник картографических данных).
+map.attributionControl.setPrefix(false);
 L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 20, maxNativeZoom: 19,
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">участники OpenStreetMap</a>',
