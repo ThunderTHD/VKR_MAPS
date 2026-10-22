@@ -8,7 +8,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
-from app.models._common import SRID, TimestampMixin, enum_col
+from app.models._common import SRID, TimestampMixin, enum_col, point
 from app.models.network import NodeKind, SegmentKind
 
 
@@ -77,6 +77,10 @@ class Document(TimestampMixin, Base):
     sha256: Mapped[str | None] = mapped_column(sa.String(64), index=True)
     uploaded_by: Mapped[int | None] = mapped_column(sa.ForeignKey("app_user.id", ondelete="SET NULL"))
     note: Mapped[str | None] = mapped_column(sa.String(300))
+    # Где снято фото (EXIF или распознанная подпись на кадре) — этап 11
+    geom = mapped_column(point(), nullable=True)
+    taken_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    coord_source: Mapped[str | None] = mapped_column(sa.String(10))
 
 
 class PackageStatus(StrEnum):

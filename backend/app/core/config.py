@@ -48,7 +48,12 @@ class Settings(BaseSettings):
     # Часовой пояс, в котором показываются даты (сервер может работать в UTC)
     display_tz: str = "Europe/Moscow"
     monitoring_interval_min: int = 5
+    # Сколько опросов подряд без ответа — и узел считается недоступным (защита от единичных потерь)
     monitoring_fail_threshold: int = 3
+    # Запускать фоновый опрос вместе с приложением (в тестах выключен)
+    monitoring_autostart: bool = True
+    # Имитация: вероятность «самопроизвольной» аварии на каждом опросе (0 — только вручную)
+    monitoring_sim_auto_rate: float = 0.02
 
     # Допуск привязки концов линий к узлам при импорте, метры
     snap_tolerance_m: float = 10.0

@@ -90,8 +90,10 @@ flowchart TB
 | `services/calibration` | поправки длин и укрутки по инцидентам и измерениям ИД | 8 |
 | `services/asbuilt` | разбор пакетов ИД (из прототипа `id_parser.py`), правила — в YAML | 9 |
 | `services/asbuilt_qc` | проверки согласованности ИД | 9 |
-| `services/monitoring` | опрос узлов доступа, история статусов | 11 |
-| `services/photo_coords` | EXIF и OCR координат с фото | 11 |
+| `services/monitoring` | опрос узлов доступа (ping/fping, имитация), порог отказов, история статусов | 11 |
+| `services/impact` | пути узлов доступа, «что отключится», корреляция аварий → место обрыва | 11 |
+| `services/photo_coords`, `photo_points` | EXIF и OCR координат с фото, точки сети по фото | 11 |
+| `services/export` | выгрузка сети в KML и GeoJSON | 11 |
 | `services/anonymize`, `tools/generate` | обезличивание реальных данных, генератор сети | 2, 12 |
 
 ## 3. Ключевые потоки данных

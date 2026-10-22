@@ -10,6 +10,8 @@ import tempfile
 
 # Загрузки тестов — во временный каталог (до импорта приложения: настройки кэшируются)
 os.environ.setdefault("UPLOAD_DIR", tempfile.mkdtemp(prefix="vols_test_uploads_"))
+# Фоновый опрос узлов в тестах не нужен: опрос вызывается тестами явно
+os.environ.setdefault("MONITORING_AUTOSTART", "false")
 
 import pytest  # noqa: E402
 from alembic import command  # noqa: E402

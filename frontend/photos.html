@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Точки по фото — ГИС ВОЛС</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body class="splice-page">
+  <header class="splice-head">
+    <a href="/" class="brand" title="К карте"><span class="brand-mark" aria-hidden="true"></span><span class="brand-text">ГИС ВОЛС</span></a>
+    <div class="splice-title"><h1>Точки сети по фото</h1>
+      <div class="muted small">Координаты съёмки — из фото (EXIF) или с подписи на кадре «GPS-камеры»</div></div>
+    <div class="splice-tools"><a class="btn btn-small" href="/">Карта</a></div>
+  </header>
+  <main class="page-wide">
+    <section class="page-card">
+      <p>Выберите фотографии колодцев, опор, муфт (до 60 за раз). Для каждой система найдёт место съёмки
+        и ближайшую точку сети: фото можно прикрепить к ней или поставить новую точку. Ничего не записывается
+        до нажатия «Записать».</p>
+      <p class="muted small">Чтобы координаты были в фото, включите в камере телефона «Сохранять местоположение».
+        Мессенджеры вырезают координаты из фото — пересылайте снимки «файлом» или снимайте приложением,
+        которое впечатывает координаты в кадр (GPS Map Camera, Timestamp Camera и т. п.).</p>
+      <div class="toolbar">
+        <label class="btn btn-primary">Выбрать фото
+          <input id="files" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden>
+        </label>
+        <span id="progress" class="muted"></span>
+      </div>
+    </section>
+    <section id="result" class="page-card" hidden>
+      <div class="toolbar">
+        <label class="field inline">Новые точки — тип
+          <select id="kind-all">
+            <option value="well">колодец</option><option value="pole">опора</option><option value="kks">ККС</option>
+            <option value="building">здание</option><option value="closure_point">муфта вне колодца</option>
+          </select>
+        </label>
+        <button id="btn-commit" class="btn btn-primary" type="button">Записать</button>
+      </div>
+      <div class="table-scroll">
+        <table class="data-table photo-table">
+          <thead><tr><th>Фото</th><th>Место съёмки</th><th>Ближайшая точка</th><th>Действие</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script type="module" src="js/photos.js"></script>
+</body>
+</html>

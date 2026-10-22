@@ -39,6 +39,7 @@ class AccessNode(SourceMixin, TimestampMixin, Base):
     fail_count: Mapped[int] = mapped_column(sa.SmallInteger, default=0)
     status_changed_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
     last_rtt_ms: Mapped[float | None] = mapped_column(sa.Float)
+    last_poll_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
 
     node: Mapped[NetworkNode | None] = relationship()
     uplink: Mapped["AccessNode | None"] = relationship(remote_side=[id])
@@ -55,6 +56,26 @@ class NodeStatusHistory(Base):
     rtt_ms: Mapped[float | None] = mapped_column(sa.Float)
 
     __table_args__ = (sa.Index("ix_node_status_history_node_ts", "access_node_id", "ts"),)
+
+
+class SimFault(Base):
+    """Имитированная авария (режим мониторинга simulate): обрыв участка или отключение узла."""
+
+    __tablename__ = "sim_fault"
+    __table_args__ = (
+        sa.CheckConstraint("kind IN ('cut', 'power')", name="kind"),
+        sa.CheckConstraint("(kind = 'cut' AND segment_id IS NOT NULL) "
+                           "OR (kind = 'power' AND access_node_id IS NOT NULL)", name="target"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(sa.String(10))
+    segment_id: Mapped[int | None] = mapped_column(sa.ForeignKey("route_segment.id", ondelete="CASCADE"))
+    access_node_id: Mapped[int | None] = mapped_column(sa.ForeignKey("access_node.id", ondelete="CASCADE"))
+    created_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), server_default=sa.func.now())
+    expires_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    auto: Mapped[bool] = mapped_column(sa.Boolean, server_default=sa.false(), default=False)
+    note: Mapped[str | None] = mapped_column(sa.String(200))
 
 
 class InstrumentKind(StrEnum):

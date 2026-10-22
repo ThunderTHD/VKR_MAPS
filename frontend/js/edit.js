@@ -134,6 +134,7 @@ export class Editor {
       }
       if (this.isAdmin) btn("Удалить", () => this.deleteIncident(card), "btn-danger");
     }
+    this.ctx.impact?.buttons(card, btn);
     if (["node", "segment", "unclassified", "cable", "closure", "cross", "incident"].includes(card.type)) {
       btn("История", () => this.history(card), "btn-ghost");
     }
@@ -462,6 +463,10 @@ export class Editor {
       el("a", { href: `/api/documents/${d.id}/file`, target: "_blank", rel: "noopener" }, d.filename),
       el("span", { class: "meta" }, [d.kind_ru, size(d.size), new Date(d.created_at).toLocaleDateString("ru-RU"),
         d.user, d.note].filter(Boolean).join(" · ")),
+      d.lonlat ? el("span", { class: "photo-geo" }, `📍 снято ${d.coord_source === "ocr" ? "(по подписи на кадре) " : ""}` +
+        (d.distance_m !== null ? `в ${Math.round(d.distance_m)} м от объекта` : "") +
+        (d.taken_at ? ` · ${new Date(d.taken_at).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" })}` : ""))
+        : null,
       this.isAdmin ? el("button", { type: "button", class: "btn btn-small btn-ghost", title: "Удалить документ",
         onclick: async () => {
           if (!confirm(`Удалить документ «${d.filename}»?`)) return;
@@ -487,8 +492,8 @@ export class Editor {
         fd.append("kind", "photo");
         this.ctx.toast("Загружаю фото…");
         try {
-          await api("/api/documents", { method: "POST", body: fd });
-          this.ctx.toast("Фото прикреплено");
+          const r = await api("/api/documents", { method: "POST", body: fd });
+          this.ctx.toast(r.coord_source ? "Фото прикреплено, место съёмки определено" : "Фото прикреплено");
           this.documents(card);
         } catch (err) {
           this.ctx.toast(err.message);

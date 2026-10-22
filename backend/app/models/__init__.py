@@ -25,6 +25,7 @@ from app.models.operations import (
     MeasurementKind,
     NodeStatus,
     NodeStatusHistory,
+    SimFault,
     SimTruth,
 )
 from app.models.reference import CableType, ColorKind, ColorScheme, ColorSchemeEntry, LengthSource, Operator, Owner
@@ -52,5 +53,5 @@ __all__ = [
     "Incident", "IncidentStatus", "Instrument", "InstrumentKind", "Jumper", "KmlFolderRule", "LengthSource",
     "LengthSourceCode", "MapOverlay", "Measurement", "MeasurementKind", "NetworkNode", "NodeKind", "NodeStatus",
     "NodeStatusHistory", "OpticalCross", "Operator", "Owner", "PackageStatus", "Role", "RouteSegment",
-    "SegmentKind", "SimTruth", "SourceKind", "Splice", "UnclassifiedFeature",
+    "SegmentKind", "SimFault", "SimTruth", "SourceKind", "Splice", "UnclassifiedFeature",
 ]

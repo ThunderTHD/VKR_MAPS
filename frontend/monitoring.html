@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Мониторинг — ГИС ВОЛС</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body class="splice-page">
+  <header class="splice-head">
+    <a href="/" class="brand" title="К карте"><span class="brand-mark" aria-hidden="true"></span><span class="brand-text">ГИС ВОЛС</span></a>
+    <div class="splice-title"><h1>Мониторинг узлов доступа</h1>
+      <div id="mode" class="muted small"></div></div>
+    <div class="splice-tools">
+      <button id="btn-poll" class="btn btn-small" type="button" hidden>Опросить сейчас</button>
+      <a class="btn btn-small" href="/">Карта</a>
+    </div>
+  </header>
+  <main class="page-wide">
+    <section class="page-card">
+      <div id="summary" class="summary"></div>
+    </section>
+    <!-- Авария: недоступные узлы и вероятное место обрыва -->
+    <section id="alarm" class="page-card alarm" hidden></section>
+    <!-- Имитация аварий (режим simulate, администратор) -->
+    <section id="sim" class="page-card" hidden>
+      <h2>Имитация аварий</h2>
+      <p class="muted small">На ноутбуке нет связи с реальными узлами, поэтому их ответы имитируются по схеме сети:
+        узел «не отвечает», если на его линейном тракте оборван участок или у него нет питания.
+        Обрыв конкретного участка — в карточке участка на карте («Имитировать обрыв»).</p>
+      <div class="toolbar">
+        <button id="btn-random" class="btn btn-small btn-primary" type="button">Случайный обрыв кабеля</button>
+        <button id="btn-clear" class="btn btn-small" type="button">Снять все аварии</button>
+      </div>
+      <ul id="faults" class="plain-list"></ul>
+    </section>
+    <section class="page-card">
+      <div class="toolbar">
+        <label class="field inline">Показать
+          <select id="filter"><option value="">все узлы</option><option value="down">недоступные</option>
+            <option value="up">доступные</option><option value="unknown">нет данных</option></select>
+        </label>
+      </div>
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead><tr><th>Узел</th><th>Оператор</th><th>IP</th><th>Состояние</th><th>Задержка</th>
+            <th>Изменилось</th><th>Адрес</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="page-card">
+      <h2>События</h2>
+      <ul id="events" class="plain-list"></ul>
+    </section>
+  </main>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script type="module" src="js/monitoring.js"></script>
+</body>
+</html>

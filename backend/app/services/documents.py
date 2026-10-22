@@ -27,6 +27,7 @@ from app.models import (
     OpticalCross,
     RouteSegment,
 )
+from app.services import photo_coords
 from app.services.editing import EditError, audit
 from app.services.kml.jobs import store_upload
 
@@ -69,20 +70,53 @@ def attach(db: Session, *, owner_type: str, owner_id: int, filename: str, data: 
     doc.owner_type, doc.owner_id = owner_type, owner_id
     doc.mime = mimetypes.guess_type(filename)[0] or "application/octet-stream"
     doc.note = (note or "").strip() or None
+    set_coords(doc, data, ocr=dk == DocumentKind.photo)
     db.flush()
     audit(db, user_id, "attach", owner_type, owner_id, None, {"document_id": doc.id, "filename": filename})
     return doc
 
 
+def set_coords(doc: Document, data: bytes, *, ocr: bool = True) -> dict | None:
+    """Координаты места съёмки (EXIF или подпись на кадре) — в запись документа."""
+    meta = photo_coords.extract(data, doc.filename, ocr=ocr)
+    if meta and "lat" in meta:
+        doc.geom = f"SRID=4326;POINT({meta['lon']} {meta['lat']})"
+        doc.coord_source = meta["source"]
+    if meta and meta.get("taken_at"):
+        doc.taken_at = meta["taken_at"]
+    return meta
+
+
+# Геометрия владельца документа — чтобы показать, далеко ли от объекта снято фото
+OWNER_GEOM_SQL = """
+    CASE d.owner_type
+        WHEN 'node' THEN (SELECT geom FROM network_node WHERE id = d.owner_id)
+        WHEN 'segment' THEN (SELECT geom FROM route_segment WHERE id = d.owner_id)
+        WHEN 'cable' THEN (SELECT geom FROM cable WHERE id = d.owner_id)
+        WHEN 'closure' THEN (SELECT n.geom FROM closure c JOIN network_node n ON n.id = c.node_id
+                             WHERE c.id = d.owner_id)
+        WHEN 'cross' THEN (SELECT n.geom FROM optical_cross x JOIN network_node n ON n.id = x.node_id
+                           WHERE x.id = d.owner_id)
+        WHEN 'access_node' THEN (SELECT n.geom FROM access_node a JOIN network_node n ON n.id = a.node_id
+                                 WHERE a.id = d.owner_id)
+        WHEN 'incident' THEN (SELECT coalesce(actual_geom, predicted_geom) FROM incident WHERE id = d.owner_id)
+    END"""
+
+
 def list_documents(db: Session, owner_type: str, owner_id: int) -> list[dict]:
-    rows = db.execute(sa.text("""
-        SELECT d.id, d.kind, d.filename, d.size, d.note, d.created_at, u.full_name
+    rows = db.execute(sa.text(f"""
+        SELECT d.id, d.kind, d.filename, d.size, d.note, d.created_at, u.full_name, d.coord_source, d.taken_at,
+               ST_X(d.geom) AS x, ST_Y(d.geom) AS y,
+               ST_Distance(d.geom::geography, ({OWNER_GEOM_SQL})::geography) AS dist
         FROM document d LEFT JOIN app_user u ON u.id = d.uploaded_by
         WHERE d.owner_type = :t AND d.owner_id = :i ORDER BY d.created_at DESC, d.id DESC"""),
         {"t": owner_type, "i": owner_id}).all()
     return [{"id": r.id, "kind": r.kind, "kind_ru": KIND_RU.get(r.kind, r.kind), "filename": r.filename,
              "size": r.size, "note": r.note, "created_at": r.created_at.isoformat(), "user": r.full_name,
-             "inline": _ext(r.filename) in INLINE_MAGIC} for r in rows]
+             "inline": _ext(r.filename) in INLINE_MAGIC,
+             "lonlat": [r.x, r.y] if r.x is not None else None, "coord_source": r.coord_source,
+             "taken_at": r.taken_at.isoformat() if r.taken_at else None,
+             "distance_m": round(r.dist, 1) if r.dist is not None else None} for r in rows]
 
 
 def open_document(doc: Document) -> tuple[bytes, str, bool]:

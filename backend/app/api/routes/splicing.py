@@ -236,7 +236,7 @@ async def upload_doc(owner_type: OwnerType = Form(...), owner_id: int = Form(...
     data = await file.read(documents.MAX_BYTES + 1)
     doc = _run(db, documents.attach, db, owner_type=owner_type, owner_id=owner_id, filename=file.filename or "file",
                data=data, kind=kind, note=note, user_id=user.id)
-    return {"ok": True, "id": doc.id}
+    return {"ok": True, "id": doc.id, "coord_source": doc.coord_source}
 
 
 @router.get("/documents/{doc_id}/file", summary="Скачать или открыть документ", dependencies=[Depends(current_user)])

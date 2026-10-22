@@ -5,6 +5,7 @@ import { DrawTools } from "./draw.js";
 import { Editor } from "./edit.js";
 import { LAYER_INFO, MapLayers } from "./layers.js";
 import { FieldTools } from "./field.js";
+import { ImpactTool } from "./impact.js";
 import { LocateTool } from "./locate.js";
 
 const $ = (id) => document.getElementById(id);
@@ -90,6 +91,7 @@ async function openObject(type, id, { fly = true } = {}) {
 function closeCard() {
   $("card").hidden = true;
   layers.clearHighlight();
+  editor?.ctx.impact?.clear();
   state.obj = null;
   writeHash();
 }
@@ -147,6 +149,10 @@ function buildToggles() {
 }
 
 function updateFilterChip() {
+  // Экспорт сети учитывает фильтр по оператору
+  for (const fmt of ["kml", "geojson"]) {
+    $(`menu-export-${fmt}`).href = `/api/export/network.${fmt}` + (state.operator_id ? `?operator_id=${state.operator_id}` : "");
+  }
   const parts = [];
   if (state.operator_id) parts.push($("filter-operator").selectedOptions[0].text);
   if (state.owner_id) parts.push(`трассы: ${$("filter-owner").selectedOptions[0].text}`);
@@ -233,10 +239,15 @@ function togglePanel(id, btn) {
 function setupUi(user) {
   $("user-name").textContent = `${user.full_name} (${{ admin: "администратор", installer: "монтажник",
     viewer: "просмотр" }[user.role]})`;
-  if (user.role !== "viewer") $("menu-asbuilt").hidden = false;
+  if (user.role !== "viewer") {
+    $("menu-asbuilt").hidden = false;
+    $("menu-photos").hidden = false;
+  }
   if (user.role === "admin") {
     $("menu-import").hidden = false;
     $("menu-calibration").hidden = false;
+    $("menu-export-kml").hidden = false;
+    $("menu-export-geojson").hidden = false;
   }
   $("btn-user").addEventListener("click", () => togglePanel("user-menu", $("btn-user")));
   $("btn-logout").addEventListener("click", async () => {
@@ -293,6 +304,9 @@ async function main() {
   editor.ctx.draw = draw;
   editor.ctx.locate = new LocateTool({ user, map, toast, closeCard, reload: loadLayers,
     openObject: (type, id) => openObject(type, id) });
+  editor.ctx.impact = new ImpactTool({ map, toast, user, reload: loadLayers,
+    openObject: (type, id) => openObject(type, id),
+    reopen: (type, id) => openObject(type, id, { fly: false }) });
   editor.ctx.field = new FieldTools({ map, toast, closeCard, openObject: (type, id) => openObject(type, id) });
   window.vols = { map, layers, draw }; // для отладки из консоли браузера и проверок интерфейса
   fillSelect($("filter-operator"), ref.operators);
@@ -313,6 +327,11 @@ async function main() {
   await loadLayers();
   layers.applyEnabled();
   if (state.obj) openObject(state.obj.type, state.obj.id);
+  if (new URLSearchParams(location.hash.slice(1)).get("alarm")) editor.ctx.impact.showAlarm().catch((e) => toast(e.message));
+  // Статусы узлов доступа меняет фоновый опрос — раз в минуту обновляем слои (если вкладка видна и не идёт рисование)
+  setInterval(() => {
+    if (!document.hidden && !draw.active && !editor.pick) loadLayers().catch(() => {});
+  }, 60_000);
 }
 
 main().catch((e) => toast(e.message));
