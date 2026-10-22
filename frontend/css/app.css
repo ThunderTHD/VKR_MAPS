@@ -424,3 +424,55 @@ body:has(#card:not([hidden])) .fab { right: calc(var(--panel-w) + 24px); }
   .import-side { border-right: 0; order: 1; }
   .import-map { order: 0; height: 45vh; }
 }
+
+/* ---------- Рисование (этап 5) ---------- */
+
+.draw-tools {
+  position: fixed; z-index: 1000; left: 12px; bottom: 36px; display: flex; gap: 6px; padding: 6px;
+  border-radius: 14px; background: var(--surface); box-shadow: var(--shadow);
+}
+.tool-btn {
+  display: grid; justify-items: center; gap: 2px; min-width: 64px; min-height: var(--tap); padding: 6px 8px;
+  border: 0; border-radius: 10px; background: transparent; color: var(--fg); font: inherit; font-size: 12px;
+  cursor: pointer;
+}
+.tool-btn svg { width: 22px; height: 22px; fill: currentColor; }
+.tool-btn:hover { background: var(--surface-2); }
+.tool-btn.active { background: var(--accent); color: #fff; }
+
+.draw-panel { top: calc(12px + var(--topbar-h) + 8px); left: 12px; width: 340px; max-height: calc(100vh - 180px); }
+.draw-panel .panel-body p:first-child { margin-top: 6px; }
+.draw-status { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); font-size: 14px; }
+.draw-status:empty { display: none; }
+.form-actions.wrap { flex-wrap: wrap; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.kbd-hint { margin: 10px 0 0; }
+.waypoints { margin: 8px 0 0; padding-left: 22px; display: grid; gap: 2px; font-size: 14px; }
+.waypoints:empty { display: none; }
+
+/* В режиме рисования щелчки по объектам слоёв проходят на карту: привязку делает draw.js */
+body.no-hit .leaflet-map-pane .leaflet-pane:not(.leaflet-draw-pane) * { pointer-events: none !important; }
+body.drawing #map { cursor: crosshair; }
+body.drawing .leaflet-draw-pane .leaflet-marker-draggable { cursor: grab; }
+
+.vertex-handle { width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 3px solid #2563eb;
+  box-sizing: border-box; box-shadow: 0 1px 3px #0005; }
+.vertex-handle.end { background: #ffb703; border-color: #14213d; cursor: not-allowed; }
+.vertex-handle.ghost { opacity: 0.55; transform: scale(0.75); }
+.vertex-handle.ghost:hover { opacity: 1; }
+.snap-tip { font-weight: 600; }
+.wp-num { background: transparent; border: 0; box-shadow: none; color: #9d4edd; font-weight: 800; padding: 0; }
+.wp-num::before { display: none; }
+
+@media (max-width: 760px) {
+  .draw-tools { left: 8px; bottom: calc(28px + env(safe-area-inset-bottom)); }
+  .draw-panel {
+    top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 52vh;
+    border-radius: 18px 18px 0 0; padding-bottom: env(safe-area-inset-bottom);
+  }
+  body:has(#draw-panel:not([hidden])) .draw-tools,
+  body:has(#card:not([hidden])) .draw-tools { display: none; }
+}
+.edit-form .toggle input { width: 20px; height: 20px; min-height: 0; padding: 0; flex: none; }
+.draw-panel .form-actions { position: sticky; bottom: -18px; margin-bottom: -18px; padding: 12px 0 18px;
+  background: var(--surface); }

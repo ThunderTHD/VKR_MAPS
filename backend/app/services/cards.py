@@ -137,6 +137,8 @@ def cable_card(db: Session, cable_id: int) -> dict | None:
                                                   _ref("node", c.end_node_id, _node_label(c.end_node))]},
             {"title": "Муфты на кабеле", "items": [_ref("closure", i, num) for i, num in closures]},
         ],
+        "edit": {"name": c.name, "operator_id": c.operator_id, "twist_factor": c.twist_factor, "lay_year": c.lay_year,
+                 "note": c.note},
     }
 
 

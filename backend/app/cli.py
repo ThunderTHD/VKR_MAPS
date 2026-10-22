@@ -7,6 +7,7 @@
   demo-users    создать демонстрационных пользователей (admin, montazhnik, viewer)
   stats         показать, сколько объектов в базе
   import-kml    импорт KML/KMZ (по умолчанию — только отчёт; --commit — записать)
+  clear-generated  удалить тестовую сеть генератора (импортированные данные остаются)
 """
 import argparse
 import sys
@@ -85,6 +86,20 @@ def cmd_import_kml(args: argparse.Namespace) -> None:
                 print("  (пробный прогон — добавьте --commit, чтобы записать)")
 
 
+def cmd_clear_generated(args: argparse.Namespace) -> None:
+    from app.services.cleanup import clear_generated
+
+    with SessionLocal() as db:
+        result = clear_generated(db)
+        db.commit()
+    print("Удалено:")
+    for label, n in result["deleted"].items():
+        print(f"  {label:<24} {n}")
+    if result["kept_nodes"] or result["kept_segments"]:
+        print(f"Оставлено (к ним привязаны настоящие данные): точек {result['kept_nodes']}, "
+              f"участков {result['kept_segments']}")
+
+
 def cmd_stats(_: argparse.Namespace) -> None:
     with SessionLocal() as db:
         for key, value in collect_stats(db).items():
@@ -109,6 +124,8 @@ def main(argv: list[str] | None = None) -> None:
 
     sub.add_parser("demo-users", help="создать демонстрационных пользователей").set_defaults(func=cmd_demo_users)
     sub.add_parser("stats", help="сколько объектов в базе").set_defaults(func=cmd_stats)
+
+    sub.add_parser("clear-generated", help="удалить тестовую сеть генератора").set_defaults(func=cmd_clear_generated)
 
     k = sub.add_parser("import-kml", help="импорт KML/KMZ")
     k.add_argument("files", nargs="+")

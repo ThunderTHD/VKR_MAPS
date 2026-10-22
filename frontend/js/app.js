@@ -1,6 +1,7 @@
 // Главный модуль карты: загрузка справочников и слоёв, фильтры, поиск, карточки, состояние в адресе.
 import { api } from "./api.js";
 import { renderCard } from "./card.js";
+import { DrawTools } from "./draw.js";
 import { Editor } from "./edit.js";
 import { LAYER_INFO, MapLayers } from "./layers.js";
 
@@ -22,6 +23,7 @@ map.setView([55.74, 52.4], 12); // Набережные Челны — до за
 
 let layers;
 let editor;
+let draw;
 
 // ---------- Состояние в адресной строке: #op=1&owner=2&obj=cable:5 ----------
 
@@ -232,7 +234,7 @@ function setupUi(user) {
     location.href = "/login.html";
   });
   $("btn-layers").addEventListener("click", () => togglePanel("layers-panel", $("btn-layers")));
-  document.querySelectorAll("[data-close]").forEach((b) =>
+  document.querySelectorAll("[data-close]:not([data-close=draw-panel])").forEach((b) =>
     b.addEventListener("click", () => (b.dataset.close === "card" ? closeCard() : ($(b.dataset.close).hidden = true))));
   $("filter-operator").addEventListener("change", applyFilters);
   $("filter-owner").addEventListener("change", applyFilters);
@@ -259,7 +261,7 @@ function setupUi(user) {
     toast(location.protocol === "https:" || location.hostname === "localhost"
       ? `Не удалось определить местоположение: ${e.message}`
       : "Геолокация работает только по HTTPS — на сервере компании нужен сертификат"));
-  document.addEventListener("keydown", (e) => e.key === "Escape" && !$("card").hidden && closeCard());
+  document.addEventListener("keydown", (e) => e.key === "Escape" && !draw.active && !$("card").hidden && closeCard());
 }
 
 // ---------- Запуск ----------
@@ -268,6 +270,7 @@ async function main() {
   const user = await api("/api/auth/me");
   const ref = await api("/api/map/reference");
   layers = new MapLayers(map, ref, (type, id) => {
+    if (draw.active) return; // в режиме рисования щелчки обрабатывает DrawTools
     if (!editor.interceptSelect(type, id)) openObject(type, id, { fly: false });
   });
   editor = new Editor({
@@ -275,6 +278,10 @@ async function main() {
     reload: loadLayers,
     reopen: (type, id) => openObject(type, id, { fly: false }),
   });
+  draw = new DrawTools({ user, ref, map, layers, toast, closeCard, reload: loadLayers,
+    openObject: (type, id) => openObject(type, id, { fly: false }) });
+  editor.ctx.draw = draw;
+  window.vols = { map, layers, draw }; // для отладки из консоли браузера и проверок интерфейса
   fillSelect($("filter-operator"), ref.operators);
   fillSelect($("filter-owner"), ref.owners);
   legend($("legend-owners"), ref.owners, "line");

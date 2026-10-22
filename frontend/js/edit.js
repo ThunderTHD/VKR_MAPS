@@ -3,10 +3,12 @@
 import { api } from "./api.js";
 
 const ACTION_RU = { update: "изменение", move: "перенос", merge: "объединение", delete: "удаление",
-  classify: "назначение типа", import: "импорт", create: "создание", login: "вход" };
+  classify: "назначение типа", import: "импорт", create: "создание", login: "вход", reshape: "изменение формы",
+  split: "вставка точки", reroute: "перекладка" };
 const FIELD_RU = { kind: "тип", code: "код", name: "название", owner_id: "владелец", address: "адрес",
   note: "примечание", fact_length_m: "длина, м", length_source: "источник длины", length_note: "комментарий",
-  channels_total: "каналов", lon: "долгота", lat: "широта" };
+  channels_total: "каналов", lon: "долгота", lat: "широта", operator_id: "оператор", twist_factor: "укрутка",
+  lay_year: "год прокладки", length_m: "длина, м", vertices: "изгибов", segments: "участков" };
 
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
@@ -72,12 +74,21 @@ export class Editor {
     }
     if (card.type === "segment" && (this.isAdmin || this.isInstaller)) {
       btn(this.isAdmin ? "Изменить" : "Уточнить длину", () => this.segmentForm(card));
-      if (this.isAdmin) btn("Удалить", () => this.deleteSegment(card), "btn-danger");
+      if (this.isAdmin) {
+        btn("Форма трассы", () => this.ctx.draw.reshape(card));
+        btn("Вставить колодец", () => this.ctx.draw.split(card));
+        btn("Удалить", () => this.deleteSegment(card), "btn-danger");
+      }
+    }
+    if (card.type === "cable" && this.isAdmin) {
+      btn("Изменить", () => this.cableForm(card));
+      btn("Перепроложить", () => this.ctx.draw.reroute(card));
+      btn("Удалить", () => this.deleteCable(card), "btn-danger");
     }
     if (card.type === "unclassified" && this.isAdmin) {
       btn("Назначить тип", () => this.classifyForm(card));
     }
-    if (["node", "segment", "unclassified"].includes(card.type)) {
+    if (["node", "segment", "unclassified", "cable"].includes(card.type)) {
       btn("История", () => this.history(card), "btn-ghost");
     }
     return box.childElementCount ? box : null;
@@ -157,6 +168,36 @@ export class Editor {
       });
   }
 
+  cableForm(card) {
+    const e = card.edit;
+    this._form(card, "Изменить кабель", [
+      field("Название", el("input", { name: "name", value: e.name ?? "", required: true })),
+      field("Оператор", select("operator_id", this.ctx.ref.operators.map((o) => [o.id, o.name]), e.operator_id)),
+      field("Укрутка, %", el("input", { name: "twist", type: "number", step: "0.1", min: "0", max: "19",
+        value: Math.round(e.twist_factor * 1000) / 10 })),
+      field("Год прокладки", el("input", { name: "lay_year", type: "number", min: "1970", max: "2100",
+        value: e.lay_year ?? "" })),
+      field("Примечание", el("textarea", { name: "note", rows: 2 }, e.note ?? "")),
+      el("p", { class: "muted small" }, "Марку кабеля сменить нельзя: от неё зависят волокна и рассветка. ",
+        "Путь кабеля меняется кнопкой «Перепроложить»."),
+    ], (fd) => api(`/api/cables/${card.id}`, { method: "PATCH", body: {
+      name: fd.get("name"), operator_id: Number(fd.get("operator_id")),
+      twist_factor: (Number(fd.get("twist")) || 0) / 100, lay_year: Number(fd.get("lay_year")) || null,
+      note: fd.get("note") || null } }));
+  }
+
+  async deleteCable(card) {
+    if (!confirm(`Удалить кабель «${card.title}» вместе с волокнами и маршрутом?`)) return;
+    try {
+      await api(`/api/cables/${card.id}`, { method: "DELETE" });
+      this.ctx.closeCard();
+      await this.ctx.reload();
+      this.ctx.toast("Кабель удалён");
+    } catch (e) {
+      this.ctx.toast(e.message);
+    }
+  }
+
   classifyForm(card) {
     const isPoint = card.geom_type === "POINT";
     const owners = this.ctx.ref.owners.map((o) => [o.id, o.name]);
@@ -188,6 +229,8 @@ export class Editor {
         el("button", { type: "button", class: "btn btn-small", onclick: () => this._cancelPick() }, "Отмена"));
       document.body.append(banner);
       document.body.classList.add("picking");
+      // Выбор места: щелчки по объектам слоёв должны доходить до карты (см. .no-hit в css)
+      if (kind === "point") document.body.classList.add("no-hit");
       this.pick.banner = banner;
     });
   }
@@ -197,6 +240,7 @@ export class Editor {
     this.pick = null;
     p.banner.remove();
     document.body.classList.remove("picking");
+    if (!this.ctx.draw?.active) document.body.classList.remove("no-hit");
     p.resolve(value);
   }
 
@@ -266,7 +310,8 @@ export class Editor {
   // ---------- история ----------
 
   async history(card) {
-    const entity = { node: "network_node", segment: "route_segment", unclassified: "unclassified_feature" }[card.type];
+    const entity = { node: "network_node", segment: "route_segment", unclassified: "unclassified_feature",
+      cable: "cable" }[card.type];
     const rows = await api("/api/audit", { params: { entity_type: entity, entity_id: card.id } });
     const body = document.getElementById("card-body");
     const list = rows.length ? rows.map((r) => {
