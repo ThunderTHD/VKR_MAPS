@@ -7,7 +7,7 @@ from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app import __version__
-from app.api.routes import asbuilt, auth, drawing, edit, health, imports, incidents, locate, map, splicing, stats
+from app.api.routes import asbuilt, auth, drawing, edit, health, imports, incidents, locate, map, phone, splicing, stats
 from app.core.auth import current_user
 from app.core.config import get_settings
 
@@ -24,6 +24,7 @@ def create_app() -> FastAPI:
         openapi_url="/api/openapi.json",
     )
     app.include_router(health.router, prefix="/api")          # открыт: проверка работоспособности
+    app.include_router(phone.router, prefix="/api")           # открыт: нужен Caddy и телефону до входа
     app.include_router(auth.router, prefix="/api")
     app.include_router(stats.router, prefix="/api", dependencies=[Depends(current_user)])
     app.include_router(map.router, prefix="/api")

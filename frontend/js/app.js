@@ -4,6 +4,7 @@ import { renderCard } from "./card.js";
 import { DrawTools } from "./draw.js";
 import { Editor } from "./edit.js";
 import { LAYER_INFO, MapLayers } from "./layers.js";
+import { FieldTools } from "./field.js";
 import { LocateTool } from "./locate.js";
 
 const $ = (id) => document.getElementById(id);
@@ -243,7 +244,7 @@ function setupUi(user) {
     location.href = "/login.html";
   });
   $("btn-layers").addEventListener("click", () => togglePanel("layers-panel", $("btn-layers")));
-  document.querySelectorAll("[data-close]:not([data-close=draw-panel]):not([data-close=locate-panel])").forEach((b) =>
+  document.querySelectorAll("[data-close]:not([data-close=draw-panel]):not([data-close=locate-panel]):not([data-close=nearby-panel])").forEach((b) =>
     b.addEventListener("click", () => (b.dataset.close === "card" ? closeCard() : ($(b.dataset.close).hidden = true))));
   $("filter-operator").addEventListener("change", applyFilters);
   $("filter-owner").addEventListener("change", applyFilters);
@@ -292,6 +293,7 @@ async function main() {
   editor.ctx.draw = draw;
   editor.ctx.locate = new LocateTool({ user, map, toast, closeCard, reload: loadLayers,
     openObject: (type, id) => openObject(type, id) });
+  editor.ctx.field = new FieldTools({ map, toast, closeCard, openObject: (type, id) => openObject(type, id) });
   window.vols = { map, layers, draw }; // для отладки из консоли браузера и проверок интерфейса
   fillSelect($("filter-operator"), ref.operators);
   fillSelect($("filter-owner"), ref.owners);

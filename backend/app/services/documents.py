@@ -16,15 +16,26 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.models import AccessNode, Cable, Closure, Document, DocumentKind, NetworkNode, OpticalCross, RouteSegment
+from app.models import (
+    AccessNode,
+    Cable,
+    Closure,
+    Document,
+    DocumentKind,
+    Incident,
+    NetworkNode,
+    OpticalCross,
+    RouteSegment,
+)
 from app.services.editing import EditError, audit
 from app.services.kml.jobs import store_upload
 
 MAX_BYTES = 50 * 1024 * 1024
-OWNERS = {"node": NetworkNode, "segment": RouteSegment, "cable": Cable, "closure": Closure, "cross": OpticalCross,
+OWNERS = {"incident": Incident,
+          "node": NetworkNode, "segment": RouteSegment, "cable": Cable, "closure": Closure, "cross": OpticalCross,
           "access_node": AccessNode}
-ALLOWED_EXT = {".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".doc", ".docx", ".xls", ".xlsx", ".odt", ".ods",
-               ".txt", ".csv", ".sor", ".kml", ".kmz", ".dwg", ".dxf", ".zip", ".7z", ".rar"}
+ALLOWED_EXT = {".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".heic", ".heif", ".doc", ".docx", ".xls", ".xlsx",
+               ".odt", ".ods", ".txt", ".csv", ".sor", ".kml", ".kmz", ".dwg", ".dxf", ".zip", ".7z", ".rar"}
 # Подписи форматов, которые можно показывать прямо в браузере
 INLINE_MAGIC = {".pdf": [b"%PDF-"], ".png": [b"\x89PNG\r\n\x1a\n"], ".jpg": [b"\xff\xd8\xff"],
                 ".jpeg": [b"\xff\xd8\xff"], ".gif": [b"GIF87a", b"GIF89a"], ".webp": [b"RIFF"]}

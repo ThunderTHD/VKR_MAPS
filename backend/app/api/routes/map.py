@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.auth import current_user
 from app.core.db import get_db
 from app.models import AppUser, CableType, LengthSource, Operator, Owner
-from app.services import cards
+from app.services import cards, field
 from app.services.map_data import LAYERS, MapFilter, layer_geojson, network_extent
 
 router = APIRouter(tags=["Карта"], dependencies=[Depends(current_user)])
@@ -38,6 +38,12 @@ def get_layer(
     assert layer in LAYERS
     flt = MapFilter(operator_id=operator_id, owner_id=owner_id, bbox=_parse_bbox(bbox))
     return Response(layer_geojson(db, layer, flt), media_type="application/geo+json")
+
+
+@router.get("/nearby", summary="Рядом со мной: точки сети, муфты и повреждения в работе с расстоянием")
+def nearby(lon: float = Query(ge=-180, le=180), lat: float = Query(ge=-90, le=90),
+           radius: float = Query(300, gt=0, le=5000), db: Session = Depends(get_db)) -> dict:
+    return field.nearby(db, lon, lat, radius)
 
 
 @router.get("/map/reference", summary="Справочники для легенды и фильтров")

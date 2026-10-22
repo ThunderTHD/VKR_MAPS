@@ -1,5 +1,6 @@
 # Запуск всей системы одной командой:  docker compose up -d --build
 # После запуска: http://localhost:8000  (документация API — /api/docs)
+# С телефона в той же Wi-Fi-сети: https://<IP ноутбука>:8443  (адрес и QR-код покажет phone.bat)
 name: vols-gis
 
 services:
@@ -35,11 +36,30 @@ services:
       SECRET_KEY: ${SECRET_KEY:-dev-only-secret-change-me-on-server-0123456789}
       ENVIRONMENT: ${ENVIRONMENT:-dev}
       MONITORING_MODE: ${MONITORING_MODE:-simulate}
+      PHONE_HOST: ${PHONE_HOST:-}
+      HTTPS_PORT: ${HTTPS_PORT:-8443}
     volumes:
       - uploads:/data/uploads
     ports:
       - "${APP_PORT:-8000}:8000"
 
+  # HTTPS для телефонов монтажников: геолокация и камера в браузере работают только по https
+  https:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    environment:
+      PHONE_HOST: ${PHONE_HOST:-127.0.0.1}
+    depends_on:
+      - app
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    ports:
+      - "${HTTPS_PORT:-8443}:443"
+
 volumes:
   pgdata:
   uploads:
+  caddy_data:
+  caddy_config:

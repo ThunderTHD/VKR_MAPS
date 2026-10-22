@@ -1,6 +1,7 @@
 // Редактирование из карточки: формы правки, перенос узла, объединение дублей, удаление,
 // назначение типа неклассифицированным, история изменений.
 import { api } from "./api.js";
+import { getPosition, routeUrl } from "./field.js";
 
 const ACTION_RU = { update: "изменение", move: "перенос", merge: "объединение", delete: "удаление",
   classify: "назначение типа", import: "импорт", create: "создание", login: "вход", reshape: "изменение формы",
@@ -33,7 +34,7 @@ function select(name, options, value, { empty } = {}) {
   return s;
 }
 
-const DOC_OWNERS = ["node", "segment", "cable", "closure", "cross", "access_node"];
+const DOC_OWNERS = ["node", "segment", "cable", "closure", "cross", "access_node", "incident"];
 const DOC_KIND_RU = { splice_scheme: "Схема рассветки", route_scheme: "Схема трассы", passport: "Паспорт",
   act: "Акт", asbuilt: "Исполнительная документация", photo: "Фото", other: "Прочее" };
 
@@ -116,6 +117,10 @@ export class Editor {
     }
     if (card.type === "unclassified" && this.isAdmin) {
       btn("Назначить тип", () => this.classifyForm(card));
+    }
+    if (card.type === "incident" && card.lonlat && card.status !== "repaired") {
+      box.append(el("a", { class: "btn btn-small", href: routeUrl(card.lonlat), target: "_blank", rel: "noopener" },
+        "Маршрут"));
     }
     if (card.type === "incident" && (this.isAdmin || this.isInstaller)) {
       if (card.status === "localized" || card.status === "open") {
@@ -354,10 +359,42 @@ export class Editor {
 
   // ---------- повреждения ----------
 
-  async markActual(card) {
+  /** Где повреждение оказалось на самом деле: по GPS телефона (монтажник на месте) или щелчком на карте. */
+  markActual(card) {
+    const body = document.getElementById("card-body");
+    const status = el("p", { class: "muted small" });
+    body.replaceChildren(el("div", { class: "edit-form" }, el("h3", {}, "Фактическое место повреждения"),
+      el("p", { class: "muted small" }, "Если вы на месте повреждения — отметьте по GPS. Иначе укажите точку на карте."),
+      el("button", { type: "button", class: "btn btn-primary", onclick: async () => {
+        status.textContent = "Определяю местоположение…";
+        try {
+          const p = await getPosition();
+          if (p.accuracy > 30 && !confirm(`Точность GPS ± ${Math.round(p.accuracy)} м — это много. Всё равно отметить?`)) {
+            status.textContent = "";
+            return;
+          }
+          await this._saveActual(card, { lon: p.lon, lat: p.lat, note: `отмечено по GPS, точность ± ${Math.round(p.accuracy)} м` });
+        } catch (e) {
+          status.textContent = e.message;
+        }
+      } }, "Я здесь — отметить по GPS"),
+      el("button", { type: "button", class: "btn", onclick: () => this._markOnMap(card) }, "Указать на карте"),
+      status,
+      el("button", { type: "button", class: "btn btn-small btn-ghost", onclick: () => this.ctx.reopen("incident", card.id) },
+        "Отмена")));
+  }
+
+  async _markOnMap(card) {
     const pos = await this._startPick("point",
       "Щёлкните на карте место, где повреждение оказалось на самом деле. Ошибка прогноза посчитается сама.");
-    if (!pos) return;
+    if (!pos) {
+      this.ctx.reopen("incident", card.id);
+      return;
+    }
+    await this._saveActual(card, pos);
+  }
+
+  async _saveActual(card, pos) {
     try {
       const r = await api(`/api/incidents/${card.id}/actual`, { method: "POST", body: pos });
       await this.ctx.reload();
@@ -417,6 +454,10 @@ export class Editor {
     const canUpload = this.isAdmin || this.isInstaller;
     if (!docs.length && !canUpload) return;
     const size = (b) => (b > 1048576 ? `${(b / 1048576).toFixed(1)} МБ` : `${Math.max(1, Math.round(b / 1024))} КБ`);
+    const photos = docs.filter((d) => d.inline && d.kind === "photo");
+    const gallery = photos.length ? el("div", { class: "photo-strip" }, photos.map((d) =>
+      el("a", { href: `/api/documents/${d.id}/file`, target: "_blank", rel: "noopener", title: d.note || d.filename },
+        el("img", { src: `/api/documents/${d.id}/file`, alt: d.note || "фото", loading: "lazy" })))) : null;
     const list = el("ul", { class: "docs" }, docs.map((d) => el("li", {},
       el("a", { href: `/api/documents/${d.id}/file`, target: "_blank", rel: "noopener" }, d.filename),
       el("span", { class: "meta" }, [d.kind_ru, size(d.size), new Date(d.created_at).toLocaleDateString("ru-RU"),
@@ -431,10 +472,32 @@ export class Editor {
             this.ctx.toast(e.message);
           }
         } }, "✕") : null)));
-    const parts = [el("h3", {}, `Документы${docs.length ? ` (${docs.length})` : ""}`), docs.length ? list : null];
+    const parts = [el("h3", {}, `Документы и фото${docs.length ? ` (${docs.length})` : ""}`), gallery,
+      docs.length ? list : null];
     if (canUpload) {
+      // Фото с места: на телефоне сразу открывается камера
+      const cam = el("input", { type: "file", accept: "image/*", capture: "environment", hidden: true });
+      cam.addEventListener("change", async () => {
+        const f = cam.files[0];
+        if (!f) return;
+        const fd = new FormData();
+        fd.append("file", f, f.name || "фото.jpg");
+        fd.append("owner_type", card.type);
+        fd.append("owner_id", card.id);
+        fd.append("kind", "photo");
+        this.ctx.toast("Загружаю фото…");
+        try {
+          await api("/api/documents", { method: "POST", body: fd });
+          this.ctx.toast("Фото прикреплено");
+          this.documents(card);
+        } catch (err) {
+          this.ctx.toast(err.message);
+        }
+      });
+      parts.push(el("button", { type: "button", class: "btn btn-small photo-btn", onclick: () => cam.click() },
+        "📷 Сфотографировать"), cam);
       const file = el("input", { type: "file", name: "file", required: true,
-        accept: ".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.xls,.xlsx,.odt,.ods,.txt,.csv,.sor,.kml,.kmz,.dwg,.dxf,.zip,.7z,.rar" });
+        accept: ".pdf,.png,.jpg,.jpeg,.gif,.webp,.heic,.doc,.docx,.xls,.xlsx,.odt,.ods,.txt,.csv,.sor,.kml,.kmz,.dwg,.dxf,.zip,.7z,.rar" });
       const kinds = Object.entries(DOC_KIND_RU);
       const form = el("form", { class: "doc-upload" }, file,
         select("kind", kinds, card.type === "closure" ? "splice_scheme" : "other"),

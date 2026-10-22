@@ -32,6 +32,7 @@
         <a id="menu-import" href="/import.html" hidden>Импорт KML</a>
         <a id="menu-asbuilt" href="/asbuilt.html" hidden>Пакеты ИД</a>
         <a id="menu-calibration" href="/calibration.html" hidden>Калибровка</a>
+        <a href="/phone.html">Вход с телефона</a>
         <a href="/status.html">Состояние системы</a>
         <a href="/api/docs" target="_blank" rel="noopener">Документация API</a>
         <button id="btn-logout" type="button">Выйти</button>
@@ -116,6 +117,17 @@
     <div class="panel-body"></div>
   </aside>
 
+  <aside id="nearby-panel" class="panel draw-panel nearby-panel" hidden aria-live="polite">
+    <div class="panel-head">
+      <h2>Рядом со мной</h2>
+      <button class="icon-btn small" data-close="nearby-panel" aria-label="Закрыть">✕</button>
+    </div>
+    <div class="panel-body"></div>
+  </aside>
+
+  <button id="btn-nearby" class="fab fab-nearby" title="Что рядом со мной" aria-label="Что рядом со мной">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7Zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5Z"/></svg>
+  </button>
   <button id="btn-locate" class="fab" title="Моё местоположение" aria-label="Моё местоположение">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm9 3h-2.06A7 7 0 0 0 13 5.06V3h-2v2.06A7 7 0 0 0 5.06 11H3v2h2.06A7 7 0 0 0 11 18.94V21h2v-2.06A7 7 0 0 0 18.94 13H21v-2Zm-9 6a5 5 0 1 1 0-10 5 5 0 0 1 0 10Z"/></svg>
   </button>

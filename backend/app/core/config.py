@@ -53,6 +53,12 @@ class Settings(BaseSettings):
     # Допуск привязки концов линий к узлам при импорте, метры
     snap_tolerance_m: float = 10.0
 
+    # Вход с телефона по HTTPS (этап 10).
+    # Порт HTTPS-прокси Caddy (deploy/Caddyfile)
+    https_port: int = 8443
+    # Адрес ноутбука/сервера в локальной сети, на который выпущен HTTPS-сертификат (пишет phone.bat)
+    phone_host: str = ""
+
     # Язык Tesseract для OCR
     tesseract_lang: str = "rus"
 

@@ -1,0 +1,28 @@
+# HTTPS-вход для телефонов монтажников.
+# Браузер телефона даёт геолокацию и камеру только сайту, открытому по https://.
+# Caddy выпускает сертификат собственным локальным центром сертификации (tls internal)
+# на адрес ноутбука/сервера в локальной сети — его записывает в .env (PHONE_HOST) phone.bat.
+# Телефон один раз покажет предупреждение о недоверенном сертификате — его нужно принять,
+# либо установить на телефон корневой сертификат со страницы phone.html, тогда предупреждений не будет.
+{
+	# Не пытаться ставить корневой сертификат в систему контейнера
+	skip_install_trust
+	# Телефон, пришедший по IP, не сообщает имя сервера (SNI) — подставляем адрес из .env
+	default_sni {$PHONE_HOST:127.0.0.1}
+}
+
+https://localhost, https://{$PHONE_HOST:127.0.0.1} {
+	tls internal
+	encode gzip
+	# Корневой сертификат для установки на телефон (только сертификат, ключ остаётся в Caddy)
+	handle /api/phone/root.crt {
+		root * /data/caddy/pki/authorities/local
+		rewrite * /root.crt
+		header Content-Type application/x-x509-ca-cert
+		header Content-Disposition "attachment; filename=vols-root.crt"
+		file_server
+	}
+	handle {
+		reverse_proxy app:8000
+	}
+}

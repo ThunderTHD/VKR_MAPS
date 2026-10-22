@@ -221,7 +221,7 @@ def disconnect(cross_id: int, data: DisconnectIn, db: Session = Depends(get_db),
 
 # ------------------------------------------------------------------ документы
 
-OwnerType = Literal["node", "segment", "cable", "closure", "cross", "access_node"]
+OwnerType = Literal["node", "segment", "cable", "closure", "cross", "access_node", "incident"]
 
 
 @router.get("/documents", summary="Документы объекта", dependencies=[Depends(current_user)])
