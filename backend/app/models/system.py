@@ -80,6 +80,8 @@ class Document(TimestampMixin, Base):
 
 
 class PackageStatus(StrEnum):
+    processing = "processing"  # идёт разбор (в фоне: OCR сканов занимает до минуты)
+    failed = "failed"          # файл не удалось разобрать
     parsed = "parsed"        # разобран, ждёт проверки
     confirmed = "confirmed"  # данные перенесены в сеть
     rejected = "rejected"
@@ -101,6 +103,9 @@ class AsBuiltPackage(TimestampMixin, Base):
     parse_result = mapped_column(JSONB, nullable=True)  # как пришло из документа (до подтверждения)
     check_report = mapped_column(JSONB, nullable=True)
     uploaded_by: Mapped[int | None] = mapped_column(sa.ForeignKey("app_user.id", ondelete="SET NULL"))
+    filename: Mapped[str | None] = mapped_column(sa.String(255))
+    error: Mapped[str | None] = mapped_column(sa.Text)
+    cable_id: Mapped[int | None] = mapped_column(sa.ForeignKey("cable.id", ondelete="SET NULL"))
 
     document: Mapped[Document | None] = relationship()
 

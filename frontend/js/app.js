@@ -232,6 +232,7 @@ function togglePanel(id, btn) {
 function setupUi(user) {
   $("user-name").textContent = `${user.full_name} (${{ admin: "администратор", installer: "монтажник",
     viewer: "просмотр" }[user.role]})`;
+  if (user.role !== "viewer") $("menu-asbuilt").hidden = false;
   if (user.role === "admin") {
     $("menu-import").hidden = false;
     $("menu-calibration").hidden = false;

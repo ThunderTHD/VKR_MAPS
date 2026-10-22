@@ -657,3 +657,11 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
   box-sizing: border-box; font-size: 13px; }
 .incident-icon.st-repaired span { background: #6c757d; }
 @media (max-width: 760px) { .page-wide { padding: 10px; } .cmps { grid-template-columns: 1fr; } }
+
+/* ---------- Пакеты ИД (этап 9) ---------- */
+.progress { height: 10px; border-radius: 5px; background: var(--surface-2); overflow: hidden; }
+.progress div { height: 100%; background: var(--accent); transition: width 0.4s; }
+.port-picker { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); }
+.trace-steps { padding-left: 20px; display: grid; gap: 4px; }
+.step .fields { margin-top: 4px; }
+.sum span { overflow-wrap: anywhere; hyphens: auto; }

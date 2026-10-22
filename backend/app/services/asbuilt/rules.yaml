@@ -1,0 +1,97 @@
+# Правила разбора пакетов ИД: как распознать тип страницы по её тексту.
+# Порядок важен — срабатывает первое совпадение. Чтобы поддержать новую форму документа
+# подрядчика, достаточно добавить правило сюда (и, если нужно, извлечение данных в parser.py).
+page_rules:
+- kind: title
+  pattern: Исполнительная\s+Документация
+- kind: act_pnr
+  pattern: АКТ\s+при[её]мки\s+пуско-наладочных
+- kind: act_pnr_logical
+  pattern: Логические параметры
+- kind: act_acceptance
+  pattern: освидетельствования\s+и\s+приемки
+- kind: line_passport
+  pattern: ПАСПОРТ\s+на\s+законченное\s+строительством
+- kind: act_readiness
+  pattern: АКТ\s+технической\s+готовности
+- kind: conclusion
+  pattern: ^\s*Заключение
+- kind: skeleton
+  pattern: Скелетная схема
+- kind: route_scheme
+  pattern: Схема прокладки волоконно-оптического
+- kind: power_scheme
+  pattern: Схема прокладки кабеля питания|Схема подключения электропитания
+- kind: splice_scheme
+  pattern: Схема разварки
+- kind: grounding
+  pattern: Схема заземления
+- kind: rack_plan
+  pattern: План размещения оконечного оборудования
+- kind: closure_protocol
+  pattern: Протокол монтажа оптической муфты
+- kind: cross_protocol
+  pattern: Протокол монтажа оптического кросса
+- kind: otdr
+  pattern: рефлектометрические измерения
+- kind: power_meter
+  pattern: измеритель мощности
+- kind: cable_report
+  pattern: Отчет по прокладке кабеля
+- kind: insulation
+  pattern: сопротивления изоляции
+- kind: poles
+  pattern: Ведомость существующих опор
+- kind: changes
+  pattern: Перечень внесенных изменений
+- kind: calibration
+  pattern: СВИДЕТЕЛЬСТВО\s+[ОO0]\s+ПОВЕРКЕ
+- kind: factory_passport
+  pattern: Кабель марки
+- kind: declaration
+  pattern: ДЕКЛАРАЦИ
+- kind: tech_passport
+  pattern: ТЕХНИЧЕСКИЙ ПАСПОРТ
+- kind: certificate
+  pattern: СЕРТИФИКАТ
+- kind: cabinet_passport
+  pattern: Шкаф\s+настенный
+titles:
+  title: Титульный лист
+  act_pnr: Акт ПНР
+  act_pnr_logical: Акт ПНР (логические параметры)
+  act_acceptance: Акт приёмки СМР
+  line_passport: Паспорт линейного сооружения
+  conclusion: Заключение комиссии
+  act_readiness: Акт технической готовности
+  skeleton: Скелетная схема
+  route_scheme: Схема прокладки ВОК
+  power_scheme: Схема электропитания
+  splice_scheme: Схема разварки ОВ
+  grounding: Схема заземления
+  rack_plan: План размещения оборудования
+  closure_protocol: Протокол монтажа муфты
+  cross_protocol: Протокол монтажа кросса
+  otdr: Протокол рефлектометрии
+  power_meter: Протокол измерения тестером
+  cable_report: Отчёт по прокладке кабеля
+  insulation: Протокол сопротивления изоляции
+  poles: Ведомость опор и муфт
+  changes: Перечень изменений
+  calibration: Свидетельство о поверке
+  factory_passport: Заводской паспорт кабеля
+  declaration: Декларация о соответствии
+  tech_passport: Технический паспорт изделия
+  certificate: Сертификат
+  cabinet_passport: Паспорт шкафа
+  unknown: Не распознано
+  empty: Скан без текста
+archive_only:
+- cabinet_passport
+- certificate
+- conclusion
+- declaration
+- grounding
+- power_scheme
+- rack_plan
+- tech_passport

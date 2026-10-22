@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Пакеты ИД — ГИС ВОЛС</title>
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body class="import-page">
+  <aside class="import-side">
+    <header class="import-head">
+      <a href="/" class="brand" title="К карте"><span class="brand-mark" aria-hidden="true"></span>ГИС ВОЛС</a>
+      <h1>Пакеты исполнительной документации</h1>
+    </header>
+
+    <section id="step-list" class="step">
+      <label id="drop" class="drop">
+        <input id="file" type="file" accept=".pdf,application/pdf">
+        <strong>Выберите PDF пакета ИД</strong>
+        <span class="muted">или перетащите его сюда. Разбор идёт в фоне; сканы (свидетельства о поверке)
+          распознаются — это может занять несколько минут.</span>
+      </label>
+      <label class="toggle small"><input id="ocr" type="checkbox" checked> распознавать сканы (OCR)</label>
+      <p id="upload-status" class="muted" hidden></p>
+      <h2>Загруженные пакеты</h2>
+      <ul id="packages" class="jobs"></ul>
+    </section>
+
+    <section id="step-view" class="step" hidden>
+      <div class="file-line"><span id="pkg-title"></span>
+        <button id="btn-back" class="btn btn-small" type="button">← К списку</button></div>
+      <div id="pkg-body"></div>
+    </section>
+  </aside>
+
+  <main class="import-map">
+    <div id="map" aria-label="Опоры из пакета ИД"></div>
+    <div class="map-legend">
+      <span><i class="dot dot-new"></i>опора из ИД</span>
+      <span><i class="lg lg-new"></i>пролёты по ведомости опор</span>
+      <span><i class="lg lg-duplicate"></i>трассы в системе</span>
+    </div>
+  </main>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script type="module" src="js/asbuilt.js"></script>
+</body>
+</html>
