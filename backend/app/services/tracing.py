@@ -17,6 +17,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from app.models import Cable, CrossPort, Fiber, FiberEnd, LengthSourceCode, Splice
+from app.services.calib_state import TWIST_ERR_2S, CalibState, current_state
 from app.services.editing import EditError
 
 MAX_LEGS = 200  # защита от зацикливания на ошибочной рассветке
@@ -39,6 +40,8 @@ class Element:
     coords: list[list[float]] = field(default_factory=list)  # геометрия в направлении света
     node_id: int | None = None    # для запаса — узел; для участка — узел в начале
     to_node_id: int | None = None
+    twist_err: float = TWIST_ERR_2S   # погрешность укрутки (2σ)
+    raw_geom_m: float | None = None   # для участка «по карте» — длина нарисованной линии без поправки
     start_phys: float = 0.0       # физическое расстояние от начала тракта до элемента
     start_opt: float = 0.0        # оптическое
 
@@ -105,8 +108,14 @@ def start_of_port(db: Session, port_id: int) -> tuple[Fiber, FiberEnd, CrossPort
     return port.fiber, port.fiber_end, port
 
 
-def trace(db: Session, fiber_id: int, entry: str | FiberEnd, *, start_port: CrossPort | None = None) -> Trace:
-    """Пройти путь света, начиная с конца `entry` волокна `fiber_id`."""
+def trace(db: Session, fiber_id: int, entry: str | FiberEnd, *, start_port: CrossPort | None = None,
+          state: CalibState | None = None) -> Trace:
+    """Пройти путь света, начиная с конца `entry` волокна `fiber_id`.
+
+    state — параметры калибровки (по умолчанию действующие); калибровка сама строит
+    трассы с «сырыми» параметрами (calib_state.RAW), чтобы оценивать их заново.
+    """
+    state = state if state is not None else current_state(db)
     fiber = db.get(Fiber, fiber_id)
     if fiber is None:
         raise EditError("Волокно не найдено")
@@ -128,7 +137,7 @@ def trace(db: Session, fiber_id: int, entry: str | FiberEnd, *, start_port: Cros
         seen.add((fiber.id, entry.value))
         cable = fiber.cable
         tr.legs.append(Leg(cable.id, cable.name, fiber.id, fiber.number, fiber.color, entry, cable.twist_factor))
-        for el in _leg_elements(db, cable, fiber, entry, err):
+        for el in _leg_elements(db, cable, fiber, entry, err, state):
             el.start_phys, el.start_opt = phys, opt
             phys += el.length_m
             opt += el.opt_len
@@ -162,7 +171,8 @@ def trace(db: Session, fiber_id: int, entry: str | FiberEnd, *, start_port: Cros
     return tr
 
 
-def _leg_elements(db: Session, cable: Cable, fiber: Fiber, entry: FiberEnd, err: dict) -> list[Element]:
+def _leg_elements(db: Session, cable: Cable, fiber: Fiber, entry: FiberEnd, err: dict,
+                  state: CalibState) -> list[Element]:
     """Запасы и участки кабеля в порядке движения света."""
     rows = db.execute(sa.text("""
         SELECT cr.seq, s.id, cr.direction, s.node_a_id, s.node_b_id, s.fact_length_m, s.length_source,
@@ -172,17 +182,24 @@ def _leg_elements(db: Session, cable: Cable, fiber: Fiber, entry: FiberEnd, err:
         WHERE cr.cable_id = :c ORDER BY cr.seq"""), {"c": cable.id}).all()
     reserves = {r.node_id: r for r in cable.reserves}
     tw = cable.twist_factor
+    tw_err = cable.twist_err_2s if cable.twist_err_2s is not None else TWIST_ERR_2S
+    geo_pct = state.geo_err_pct if state.geo_err_pct is not None else err.get("geometry", 25.0)
     steps = []
     for _, seg_id, direction, na, nb, fact, src, geom_len, gj in rows:
         frm, to = (na, nb) if direction == 1 else (nb, na)
         coords = gj["coordinates"]
+        raw = None
         if fact is not None:
             length, source = fact, str(src.value if hasattr(src, "value") else src)
+            err2 = length * err.get(source, 25.0) / 100
         else:
-            length, source = geom_len, LengthSourceCode.geometry.value
-        steps.append(Element("segment", cable.id, cable.name, fiber.number, tw, length,
-                             length * err.get(source, 25.0) / 100, source, segment_id=seg_id, coords=coords,
-                             node_id=frm, to_node_id=to))
+            # Длина только по карте: с поправкой калибровки «реальная трасса длиннее нарисованной»
+            raw, source = geom_len, LengthSourceCode.geometry.value
+            length = geom_len * (1 + state.map_stretch)
+            err2 = length * geo_pct / 100
+        steps.append(Element("segment", cable.id, cable.name, fiber.number, tw, length, err2, source,
+                             segment_id=seg_id, coords=coords, node_id=frm, to_node_id=to, twist_err=tw_err,
+                             raw_geom_m=raw))
     if entry == FiberEnd.b:  # свет идёт от конца кабеля к началу
         for s in steps:
             s.coords = list(reversed(s.coords))
@@ -196,7 +213,7 @@ def _leg_elements(db: Session, cable: Cable, fiber: Fiber, entry: FiberEnd, err:
             src = str(r.length_source.value if hasattr(r.length_source, "value") else r.length_source)
             result.append(Element("reserve", cable.id, cable.name, fiber.number, tw, r.length_m,
                                   r.length_m * err.get(src, 10.0) / 100, src, reserve_id=r.id, node_id=node,
-                                  to_node_id=node))
+                                  to_node_id=node, twist_err=tw_err))
         if i < len(steps):
             result.append(steps[i])
     return result

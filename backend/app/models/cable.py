@@ -33,6 +33,9 @@ class Cable(SourceMixin, TimestampMixin, Base):
     cable_type_id: Mapped[int] = mapped_column(sa.ForeignKey("cable_type.id"))
     # Коэффициент укрутки: оптическая длина = физическая × (1 + twist_factor)
     twist_factor: Mapped[float] = mapped_column(sa.Float, default=0.005)
+    # Погрешность укрутки (2σ) и откуда значение: None — по умолчанию, «calibration», «manual»
+    twist_err_2s: Mapped[float | None] = mapped_column(sa.Float)
+    twist_source: Mapped[str | None] = mapped_column(sa.String(20))
     start_node_id: Mapped[int | None] = mapped_column(sa.ForeignKey("network_node.id"))
     end_node_id: Mapped[int | None] = mapped_column(sa.ForeignKey("network_node.id"))
     # Геометрия кабеля — производная от маршрута (кэш для быстрого отображения)

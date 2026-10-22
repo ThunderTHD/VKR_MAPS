@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Калибровка — ГИС ВОЛС</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body class="splice-page">
+  <header class="splice-head">
+    <a href="/" class="brand" title="К карте"><span class="brand-mark" aria-hidden="true"></span><span class="brand-text">ГИС ВОЛС</span></a>
+    <div class="splice-title"><h1>Калибровка модели длин</h1>
+      <div class="muted small">Уточнение укрутки кабелей и поправки «карта → реальная длина» по фактическим данным</div></div>
+    <div class="splice-tools"><a class="btn btn-small" href="/incidents.html">Журнал повреждений</a>
+      <a class="btn btn-small" href="/">Карта</a></div>
+  </header>
+  <main class="page-wide">
+    <section class="page-card">
+      <p>Данные для калибровки: <b>измерения трактов из ИД</b> (оптическая длина между портами кроссов) и
+        <b>устранённые повреждения</b> с отмеченным фактическим местом. По ним подбираются укрутка для каждой
+        марки кабеля и общая поправка для участков, длина которых известна только по карте. Часть данных
+        откладывается для проверки: параметры подбираются без неё, и сравнивается, насколько точнее
+        предсказываются отложенные измерения. Расчёт ничего не меняет — изменения вступают в силу после
+        кнопки «Применить», и их можно отменить.</p>
+      <button id="btn-run" class="btn btn-primary" type="button">Рассчитать калибровку</button>
+      <span id="run-status" class="muted small"></span>
+    </section>
+    <section id="result" class="page-card" hidden></section>
+    <section class="page-card">
+      <h2 class="sec-title">Прогоны</h2>
+      <div class="table-scroll"><table class="data-table">
+        <thead><tr><th>№</th><th>Рассчитан</th><th>Наблюдений</th><th>Поправка карты</th><th>Марок</th>
+          <th>Отложенная выборка, RMSE</th><th>Состояние</th></tr></thead>
+        <tbody id="runs"></tbody></table></div>
+    </section>
+  </main>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script type="module" src="js/calibration.js"></script>
+</body>
+</html>

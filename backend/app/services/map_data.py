@@ -176,6 +176,20 @@ UNCLASSIFIED_SQL = _collection(f"""
     FROM unclassified_feature u WHERE {_bbox('u.geom')}
 """)
 
+INCIDENTS_SQL = _collection(f"""
+    SELECT json_build_object(
+        'type', 'Feature', 'id', i.id,
+        'geometry', ST_AsGeoJSON(i.predicted_geom, 7)::json,
+        'properties', json_build_object(
+            'id', i.id, 'title', i.title, 'status', i.status, 'half_width_m', i.predicted_error_m,
+            'error_m', i.error_m, 'simulated', i.source_kind = 'generator',
+            'actual', CASE WHEN i.actual_geom IS NULL THEN NULL ELSE ST_AsGeoJSON(i.actual_geom, 7)::json END,
+            'detected_at', i.detected_at
+        )) AS feature
+    FROM incident i
+    WHERE i.predicted_geom IS NOT NULL AND i.status <> 'cancelled' AND {_bbox('i.predicted_geom')}
+""")
+
 LAYERS = {
     "segments": SEGMENTS_SQL,
     "nodes": NODES_SQL,
@@ -184,6 +198,7 @@ LAYERS = {
     "access_nodes": ACCESS_SQL,
     "jumpers": JUMPERS_SQL,
     "unclassified": UNCLASSIFIED_SQL,
+    "incidents": INCIDENTS_SQL,
 }
 
 

@@ -45,6 +45,8 @@ class Settings(BaseSettings):
 
     # Мониторинг узлов доступа
     monitoring_mode: MonitoringMode = MonitoringMode.simulate
+    # Часовой пояс, в котором показываются даты (сервер может работать в UTC)
+    display_tz: str = "Europe/Moscow"
     monitoring_interval_min: int = 5
     monitoring_fail_threshold: int = 3
 

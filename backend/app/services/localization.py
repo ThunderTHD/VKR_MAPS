@@ -29,9 +29,6 @@ from app.models import Incident, IncidentStatus, SourceKind
 from app.services.editing import EditError, audit
 from app.services.tracing import Element, Trace, trace_summary
 
-# Погрешность коэффициента укрутки, если он не уточнён калибровкой (2σ, абсолютная).
-# Типичный диапазон укрутки модульных кабелей 0,3–1,2 %; по умолчанию в базе 0,5 %.
-TWIST_ERR_2S = 0.004
 # Погрешность рефлектометра по расстоянию (2σ): ±(1 м + 5·10⁻⁵ · D) — порядок паспортных
 # значений приборов класса MTS/AQ7280 с учётом шага дискретизации.
 OTDR_ERR_BASE_M = 1.0
@@ -104,15 +101,15 @@ def _walk(tr: Trace, elements: list[Element], d_opt: float) -> Located:
     """Положение по оптическому расстоянию d_opt, отсчитанному от начала списка элементов."""
     phys = opt = 0.0
     contrib: dict[str, float] = {}
-    passed_by_cable: dict[int, tuple[float, float, str]] = {}
+    passed_by_cable: dict[int, tuple[float, float, float, str]] = {}
 
     def add(key: str, sigma: float) -> None:
         contrib[key] = contrib.get(key, 0.0) + sigma * sigma
 
     def passed(e: Element, part: float) -> None:
         add(f"{_label(tr, e)}: длина {SOURCE_RU.get(e.source, e.source)}", part * e.err2_m / 2)
-        length, tw, name = passed_by_cable.get(e.cable_id, (0.0, e.twist, e.cable))
-        passed_by_cable[e.cable_id] = (length + part * e.length_m, tw, name)
+        length, tw, tw_err, name = passed_by_cable.get(e.cable_id, (0.0, e.twist, e.twist_err, e.cable))
+        passed_by_cable[e.cable_id] = (length + part * e.length_m, tw, tw_err, name)
 
     pos = None
     for e in elements:
@@ -129,8 +126,8 @@ def _walk(tr: Trace, elements: list[Element], d_opt: float) -> Located:
         pos = phys
         last_tw = elements[-1].twist if elements else 0.0
         beyond = (d_opt - opt) / (1 + last_tw)
-    for length, tw, name in passed_by_cable.values():
-        add(f"укрутка кабеля «{name}»", length * (TWIST_ERR_2S / 2) / (1 + tw))
+    for length, tw, tw_err, name in passed_by_cable.values():
+        add(f"укрутка кабеля «{name}»", length * (tw_err / 2) / (1 + tw))
     add("погрешность рефлектометра", (OTDR_ERR_BASE_M + OTDR_ERR_REL * d_opt) / 2)
     return Located(pos, sum(contrib.values()), contrib, beyond)
 
@@ -274,17 +271,23 @@ def _end_text(tr: Trace) -> str:
 
 
 def save_incident(db: Session, result: dict, *, title: str | None, fiber_id: int, port_id: int | None,
-                  distance_m: float, ior: float | None, user_id: int | None) -> Incident:
+                  distance_m: float, ior: float | None, user_id: int | None, entry: str | None = None,
+                  source_kind: SourceKind = SourceKind.manual, detected_at: datetime | None = None) -> Incident:
+    """Сохранить прогноз как повреждение. Точка измерения (порт или конец волокна) запоминается —
+    по ней журнал позже пересчитает трассу, когда станет известно фактическое место."""
     place = result["place"]
     x, y = result["point"]
-    title = (title or "").strip() or f"Повреждение: {place['text']}"[:200]
+    title = (title or "").strip() or f"Повреждение на кабеле «{place.get('cable', '?')}», {distance_m:.0f} м"[:200]
     inc = Incident(status=IncidentStatus.localized, title=title,
                    fiber_id=fiber_id, measure_port_id=port_id, otdr_distance_m=distance_m, refractive_index=ior,
                    predicted_geom=f"SRID=4326;POINT({x} {y})", predicted_error_m=result["half_width_m"],
-                   predicted_segment_id=place.get("segment_id"), detected_at=datetime.now(UTC),
-                   calc_details={k: result[k] for k in ("distance_corrected_m", "position_m", "half_width_m", "place",
-                                                        "contributions", "two_sided", "warnings", "wells")},
-                   source_kind=SourceKind.manual)
+                   predicted_segment_id=place.get("segment_id"), detected_at=detected_at or datetime.now(UTC),
+                   calc_details={**{k: result[k] for k in ("distance_corrected_m", "position_m", "half_width_m",
+                                                           "place", "contributions", "two_sided", "warnings",
+                                                           "wells")},
+                                 "start": {"port_id": port_id} if port_id else {"fiber_id": fiber_id, "end": entry},
+                                 "interval": {k: result["interval"][k] for k in ("from_m", "to_m")}},
+                   source_kind=source_kind)
     db.add(inc)
     db.flush()
     audit(db, user_id, "create", "incident", inc.id, None, {"title": inc.title, "otdr_distance_m": distance_m,

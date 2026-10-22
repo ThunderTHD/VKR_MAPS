@@ -2,7 +2,7 @@
 import { GridCluster, latLng } from "./cluster.js";
 
 // Порядок отрисовки (снизу вверх) задаётся панелями Leaflet
-const PANES = { segments: 410, cables: 420, nodes: 430, closures: 440, access: 450, highlight: 460 };
+const PANES = { segments: 410, cables: 420, nodes: 430, closures: 440, access: 450, incidents: 455, highlight: 460 };
 
 export const LAYER_INFO = {
   segments: { title: "Трассы (канализация, опоры)", on: true },
@@ -12,6 +12,7 @@ export const LAYER_INFO = {
   access_nodes: { title: "Узлы доступа", on: true },
   jumpers: { title: "Перемычки", on: true },
   unclassified: { title: "Неклассифицированные", on: false },
+  incidents: { title: "Повреждения", on: true },
 };
 
 const NODE_STYLE = {
@@ -89,6 +90,28 @@ export class MapLayers {
       style: { color: "#7209b7", weight: 2, dashArray: "6 4" },
       onEachFeature: (f, l) => l.bindTooltip(f.properties.label || "Перемычка", { sticky: true }),
     });
+    // Повреждения: прогноз (красный) и, если устранено, фактическое место (зелёный) с линией между ними
+    this.layers.incidents = L.geoJSON(null, {
+      pane: "incidents",
+      pointToLayer: (f, ll) => {
+        const p = f.properties;
+        const group = L.featureGroup();
+        const icon = L.divIcon({ className: `incident-icon st-${p.status}`, html: "<span>!</span>", iconSize: [22, 22] });
+        const m = L.marker(ll, { pane: "incidents", icon }).addTo(group);
+        if (p.actual) {
+          const a = [p.actual.coordinates[1], p.actual.coordinates[0]];
+          L.polyline([ll, a], { pane: "incidents", color: "#2a9d8f", weight: 2, dashArray: "4 4", interactive: false })
+            .addTo(group);
+          L.circleMarker(a, { pane: "incidents", radius: 6, color: "#fff", weight: 2, fillColor: "#2a9d8f",
+            fillOpacity: 1 }).addTo(group);
+        }
+        m.feature = f;
+        return group;
+      },
+      onEachFeature: (f, l) => this.bind(l, "incident", f, `${f.properties.title || "Повреждение"}` +
+        (f.properties.error_m != null ? `<br>ошибка ${Math.round(f.properties.error_m)} м` : "") +
+        (f.properties.half_width_m ? `<br>прогноз ± ${Math.round(f.properties.half_width_m)} м` : "")),
+    });
     this.layers.unclassified = L.geoJSON(null, {
       pane: "segments",
       renderer: this.renderers.segments,
@@ -158,7 +181,7 @@ export class MapLayers {
   highlightObject(type, id) {
     this.highlight.clearLayers();
     const source = { segment: "segments", cable: "cables", node: "nodes", closure: "closures",
-      access_node: "access_nodes", unclassified: "unclassified" }[type];
+      access_node: "access_nodes", unclassified: "unclassified", incident: "incidents" }[type];
     const feature = source && this.data[source]?.features.find((f) => f.properties.id === id);
     if (!feature) return null;
     const shape = L.geoJSON(feature, {

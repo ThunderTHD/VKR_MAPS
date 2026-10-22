@@ -626,3 +626,34 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 @keyframes fault-pulse { 0% { box-shadow: 0 0 0 0 #d0000088; } 100% { box-shadow: 0 0 0 18px #d0000000; } }
 @media (prefers-reduced-motion: reduce) { .fault-icon span { animation: none; } }
 @media (max-width: 760px) { .locate-panel { width: auto; } body:has(#locate-panel:not([hidden])) .draw-tools { display: none; } }
+
+/* ---------- Журнал повреждений и калибровка (этап 8) ---------- */
+
+.page-wide { max-width: 1200px; margin: 0 auto; padding: 18px 20px 40px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.page-card { background: var(--surface); border-radius: var(--radius); padding: 6px 20px 20px;
+  box-shadow: 0 1px 2px #0001; }
+.page-card > p:first-child { margin-top: 14px; line-height: 1.5; }
+.sec-title { margin: 16px 0 10px; font-size: 18px; }
+.page-card h3 { margin: 20px 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.page-card .summary { margin-top: 14px; }
+.toolbar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.incidents-table tr.clickable { cursor: pointer; }
+.incidents-table tr.clickable:hover td { background: var(--surface-2); }
+.st { padding: 2px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; background: var(--surface-2); }
+.st-localized { background: #fde2e1; color: #9b1c1c; }
+.st-repaired { background: #dcf3ee; color: #1b6b60; }
+.st-cancelled { color: var(--muted); }
+.badge-test { margin-left: 6px; background: var(--surface-2); color: var(--muted); }
+.cmps { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px 24px; }
+.cmp-label { font-size: 14px; margin-bottom: 4px; }
+.cmp-row { display: grid; grid-template-columns: 44px 1fr 70px; align-items: center; gap: 8px; font-size: 13px; }
+.cmp-bar { height: 10px; border-radius: 5px; min-width: 2px; }
+.cmp-bar.before { background: #adb5bd; }
+.cmp-bar.after { background: #f77f00; }
+.cmp-bar.after.good { background: var(--ok); }
+.cmp-row b { text-align: right; font-variant-numeric: tabular-nums; }
+.incident-icon span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  background: #d00000; color: #fff; font-weight: 800; border: 2px solid #fff; box-shadow: 0 1px 4px #0006;
+  box-sizing: border-box; font-size: 13px; }
+.incident-icon.st-repaired span { background: #6c757d; }
+@media (max-width: 760px) { .page-wide { padding: 10px; } .cmps { grid-template-columns: 1fr; } }

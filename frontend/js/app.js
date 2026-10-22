@@ -229,7 +229,10 @@ function togglePanel(id, btn) {
 function setupUi(user) {
   $("user-name").textContent = `${user.full_name} (${{ admin: "администратор", installer: "монтажник",
     viewer: "просмотр" }[user.role]})`;
-  if (user.role === "admin") $("menu-import").hidden = false;
+  if (user.role === "admin") {
+    $("menu-import").hidden = false;
+    $("menu-calibration").hidden = false;
+  }
   $("btn-user").addEventListener("click", () => togglePanel("user-menu", $("btn-user")));
   $("btn-logout").addEventListener("click", async () => {
     await api("/api/auth/logout", { method: "POST" });
@@ -283,7 +286,7 @@ async function main() {
   draw = new DrawTools({ user, ref, map, layers, toast, closeCard, reload: loadLayers,
     openObject: (type, id) => openObject(type, id, { fly: false }) });
   editor.ctx.draw = draw;
-  editor.ctx.locate = new LocateTool({ user, map, toast, closeCard,
+  editor.ctx.locate = new LocateTool({ user, map, toast, closeCard, reload: loadLayers,
     openObject: (type, id) => openObject(type, id) });
   window.vols = { map, layers, draw }; // для отладки из консоли браузера и проверок интерфейса
   fillSelect($("filter-operator"), ref.operators);

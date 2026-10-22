@@ -113,6 +113,46 @@ def cmd_localize_experiment(args: argparse.Namespace) -> None:
     print(experiment.sigma_check(res))
 
 
+def cmd_simulate_incidents(args: argparse.Namespace) -> None:
+    """Устранённые повреждения на сгенерированной сети — для демонстрации журнала и калибровки."""
+    from app.services import experiment, incidents
+
+    with SessionLocal() as db:
+        experiment.simulate_incidents(db, n=args.n, seed=args.seed)
+        db.commit()
+        st = incidents.stats(db)
+    print(f"Добавлено повреждений: {args.n}. Всего устранено: {st['repaired']}, ошибка по трассе: средняя "
+          f"{st.get('route_error_mean_m')} м, медиана {st.get('route_error_median_m')} м; "
+          f"в интервале {st.get('within_pct')} %")
+
+
+def cmd_calibrate(args: argparse.Namespace) -> None:
+    from app.services import calibration
+
+    with SessionLocal() as db:
+        cr = calibration.run(db, simulate=not args.no_simulation)
+        p = cr.params
+        print(f"Наблюдений: {p['observations']} (измерений ИД {p['by_kind']['measurement']}, "
+              f"повреждений {p['by_kind']['incident']})")
+        print(f"Поправка карты: реальная трасса длиннее нарисованной на {100 * p['map_stretch']:.1f} % "
+              f"± {100 * p['map_stretch_err_2s']:.1f} %; погрешность длины по карте теперь {p['geo_err_pct']} %")
+        for pr in cr.proposals:
+            print(f"  укрутка {pr['mark']}: {100 * pr['prior']:.2f} % → {100 * pr['new']:.2f} % "
+                  f"± {100 * pr['err_2s']:.2f} % (наблюдений {pr['n_obs']}, кабелей {len(pr['cables'])})")
+        h = p["holdout"]
+        print(f"Отложенная выборка ({h['before'].get('n', 0)}): RMSE {h['before'].get('rmse_m')} → "
+              f"{h['after'].get('rmse_m')} м")
+        if "simulation" in p:
+            b, a = p["simulation"]["before"], p["simulation"]["after"]
+            print(f"Моделирование: ошибка средняя {b['error_mean_m']} → {a['error_mean_m']} м, медиана "
+                  f"{b['error_median_m']} → {a['error_median_m']} м, интервал ±{b['half_width_mean_m']} → "
+                  f"±{a['half_width_mean_m']} м, попадание {b['coverage_pct']} → {a['coverage_pct']} %")
+        if args.apply:
+            calibration.apply(db, cr, None)
+            print("Калибровка применена.")
+        db.commit()
+
+
 def cmd_stats(_: argparse.Namespace) -> None:
     with SessionLocal() as db:
         for key, value in collect_stats(db).items():
@@ -144,6 +184,16 @@ def main(argv: list[str] | None = None) -> None:
     e.add_argument("--n", type=int, default=300, help="сколько повреждений смоделировать")
     e.add_argument("--seed", type=int, default=1)
     e.set_defaults(func=cmd_localize_experiment)
+
+    si = sub.add_parser("simulate-incidents", help="смоделировать устранённые повреждения (тестовая сеть)")
+    si.add_argument("--n", type=int, default=40)
+    si.add_argument("--seed", type=int, default=11)
+    si.set_defaults(func=cmd_simulate_incidents)
+
+    ca = sub.add_parser("calibrate", help="рассчитать калибровку укрутки и поправки карты")
+    ca.add_argument("--apply", action="store_true", help="сразу применить")
+    ca.add_argument("--no-simulation", action="store_true", help="не проверять на смоделированных повреждениях")
+    ca.set_defaults(func=cmd_calibrate)
 
     k = sub.add_parser("import-kml", help="импорт KML/KMZ")
     k.add_argument("files", nargs="+")

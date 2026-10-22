@@ -201,7 +201,11 @@ export class LocateTool {
         ...this._startBody(), distance_m: Number(this.lastDistance), launch_m: num(a.launch) || 0,
         ior_set: num(a.ior_set), ior_fiber: num(a.ior_fiber), far_distance_m: num(a.far), save, title } });
       this.show(r);
-      if (r.incident_id) this.ctx.toast(`Повреждение сохранено (№${r.incident_id})`);
+      if (r.incident_id) {
+        this.ctx.toast(`Повреждение сохранено (№${r.incident_id}) — оно в журнале и на карте`);
+        await this.ctx.reload?.();
+        this.ctx.openObject("incident", r.incident_id);
+      }
     } catch (e) {
       this.fail(e);
     }

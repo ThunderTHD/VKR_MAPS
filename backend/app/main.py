@@ -7,7 +7,7 @@ from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app import __version__
-from app.api.routes import auth, drawing, edit, health, imports, locate, map, splicing, stats
+from app.api.routes import auth, drawing, edit, health, imports, incidents, locate, map, splicing, stats
 from app.core.auth import current_user
 from app.core.config import get_settings
 
@@ -32,6 +32,7 @@ def create_app() -> FastAPI:
     app.include_router(drawing.router, prefix="/api")
     app.include_router(splicing.router, prefix="/api")
     app.include_router(locate.router, prefix="/api")
+    app.include_router(incidents.router, prefix="/api")
 
     # Статику подключаем последней: маршрут "/" не должен перекрывать /api
     if s.frontend_dir.is_dir():

@@ -2,7 +2,7 @@
 
 const TYPE_RU = {
   node: "Узел", segment: "Участок трассы", cable: "Кабель", closure: "Муфта", cross: "Кросс",
-  access_node: "Узел доступа", unclassified: "Неклассифицированный",
+  access_node: "Узел доступа", unclassified: "Неклассифицированный", incident: "Повреждение",
 };
 
 function el(tag, attrs = {}, ...children) {

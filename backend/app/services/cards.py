@@ -1,13 +1,17 @@
 """Карточки объектов (что показывается по клику на карте) и поиск."""
+from zoneinfo import ZoneInfo
+
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.models import (
     AccessNode,
     Cable,
     CableReserve,
     Closure,
     CrossPort,
+    Incident,
     LengthSource,
     NetworkNode,
     OpticalCross,
@@ -230,7 +234,59 @@ def unclassified_card(db: Session, feat_id: int) -> dict | None:
     }
 
 
-CARDS = {"unclassified": unclassified_card, "node": node_card, "segment": segment_card, "cable": cable_card,
+INC_STATUS_RU = {"open": "обнаружено", "localized": "место рассчитано", "repaired": "устранено",
+                 "cancelled": "отменено"}
+
+
+def _fmt_dt(d) -> str | None:
+    """Дата и время в часовом поясе предприятия (настройка DISPLAY_TZ)."""
+    if d is None:
+        return None
+    return d.astimezone(ZoneInfo(get_settings().display_tz)).strftime("%d.%m.%Y %H:%M")
+
+
+def incident_card(db: Session, inc_id: int) -> dict | None:
+    i = db.get(Incident, inc_id)
+    if i is None:
+        return None
+    det = i.calc_details or {}
+    act = det.get("actual") or {}
+    place = det.get("place") or {}
+    lonlat = _lonlat(db, i.predicted_geom) if i.predicted_geom is not None else None
+    sections = []
+    if i.fiber is not None:
+        sections.append({"title": "Волокно", "items": [_ref("cable", i.fiber.cable_id,
+                                                             f"{i.fiber.cable.name}, ОВ {i.fiber.number}")]})
+    if place.get("segment_id"):
+        sections.append({"title": "Участок прогноза", "items": [_ref("segment", place["segment_id"],
+                                                                      place.get("text", "участок"))]})
+    wells = det.get("wells") or []
+    if wells:
+        sections.append({"title": "Колодцы в интервале", "items": [
+            _ref("node", w["node_id"], f"{w['label']} ({'+' if w['offset_m'] >= 0 else ''}{w['offset_m']:.0f} м)")
+            for w in wells[:8]]})
+    within = act.get("within_interval")
+    return {
+        "type": "incident", "id": i.id, "title": i.title or f"Повреждение №{i.id}",
+        "subtitle": f"Повреждение · {INC_STATUS_RU[i.status.value]}", "lonlat": lonlat, "status": i.status.value,
+        "fields": [
+            ["Статус", INC_STATUS_RU[i.status.value]], ["Обнаружено", _fmt_dt(i.detected_at)],
+            ["Расстояние по рефлектометру", f"{i.otdr_distance_m:.1f} м" if i.otdr_distance_m else None],
+            ["Прогноз места", place.get("text")],
+            ["Точность прогноза", f"± {i.predicted_error_m:.0f} м (95 %)" if i.predicted_error_m else None],
+            ["Устранено", _fmt_dt(i.restored_at)],
+            ["Ошибка по прямой", f"{i.error_m:.0f} м" if i.error_m is not None else None],
+            ["Ошибка по трассе", f"{act['route_error_m']:.0f} м" if act.get("route_error_m") is not None else None],
+            ["Попало в интервал", None if within is None else ("да" if within else "нет")],
+            ["Примечание", i.note],
+        ],
+        "edit": {"title": i.title, "note": i.note},
+        "sections": sections,
+    }
+
+
+CARDS = {"incident": incident_card,
+         "unclassified": unclassified_card, "node": node_card, "segment": segment_card, "cable": cable_card,
          "closure": closure_card, "cross": cross_card, "access_node": access_node_card}
 
 

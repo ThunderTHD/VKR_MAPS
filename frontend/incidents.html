@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Журнал повреждений — ГИС ВОЛС</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body class="splice-page">
+  <header class="splice-head">
+    <a href="/" class="brand" title="К карте"><span class="brand-mark" aria-hidden="true"></span><span class="brand-text">ГИС ВОЛС</span></a>
+    <div class="splice-title"><h1>Журнал повреждений</h1>
+      <div class="muted small">Прогноз места по рефлектометру и где повреждение оказалось на самом деле</div></div>
+    <div class="splice-tools"><a class="btn btn-small" href="/">Карта</a></div>
+  </header>
+  <main class="page-wide">
+    <section class="page-card">
+      <div id="summary" class="summary"></div>
+      <p id="sim-note" class="muted small" hidden>Часть записей — смоделированные повреждения тестовой сети (отмечены «тест»).</p>
+    </section>
+    <section class="page-card">
+      <div class="toolbar">
+        <label class="field inline">Статус
+          <select id="status">
+            <option value="">все</option><option value="localized">место рассчитано</option>
+            <option value="repaired">устранено</option><option value="cancelled">отменено</option>
+          </select>
+        </label>
+        <span class="muted small">Новое повреждение — инструмент «Повреждение» на карте.</span>
+      </div>
+      <div class="table-scroll">
+        <table class="data-table incidents-table">
+          <thead><tr><th>№</th><th>Название</th><th>Статус</th><th>Обнаружено</th><th>Кабель, ОВ</th>
+            <th>Рефлектометр</th><th>Прогноз</th><th>Ошибка по трассе</th><th>В интервале</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script type="module" src="js/incidents.js"></script>
+</body>
+</html>

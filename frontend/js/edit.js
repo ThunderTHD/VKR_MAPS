@@ -6,13 +6,14 @@ const ACTION_RU = { update: "изменение", move: "перенос", merge:
   classify: "назначение типа", import: "импорт", create: "создание", login: "вход", reshape: "изменение формы",
   split: "вставка точки / разрез", reroute: "перекладка", splice: "сварка", unsplice: "разварка",
   connect: "подключение портов", disconnect: "отключение портов", attach: "документ добавлен",
-  detach: "документ удалён" };
+  detach: "документ удалён", repair: "устранено, отмечено место" };
 const FIELD_RU = { kind: "тип", code: "код", name: "название", owner_id: "владелец", address: "адрес",
   note: "примечание", fact_length_m: "длина, м", length_source: "источник длины", length_note: "комментарий",
   channels_total: "каналов", lon: "долгота", lat: "широта", operator_id: "оператор", twist_factor: "укрутка",
   lay_year: "год прокладки", length_m: "длина, м", vertices: "изгибов", segments: "участков", number: "номер",
   model: "модель", connector: "разъём", port_count: "портов", a: "волокно A", b: "волокно Б", ports: "порты",
-  fibers: "волокна", cable: "кабель", filename: "файл", new_name: "новый кабель" };
+  fibers: "волокна", cable: "кабель", filename: "файл", new_name: "новый кабель", title: "название",
+  status: "статус", error_m: "ошибка, м", route_error_m: "ошибка по трассе, м" };
 
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
@@ -116,7 +117,19 @@ export class Editor {
     if (card.type === "unclassified" && this.isAdmin) {
       btn("Назначить тип", () => this.classifyForm(card));
     }
-    if (["node", "segment", "unclassified", "cable", "closure", "cross"].includes(card.type)) {
+    if (card.type === "incident" && (this.isAdmin || this.isInstaller)) {
+      if (card.status === "localized" || card.status === "open") {
+        btn("Отметить фактическое место", () => this.markActual(card), "btn-primary");
+      }
+      btn("Изменить", () => this.incidentForm(card));
+      if (card.status === "cancelled" || card.status === "repaired") {
+        btn("Вернуть в работу", () => this.incidentStatus(card, "localized"));
+      } else {
+        btn("Отменить", () => this.incidentStatus(card, "cancelled"), "btn-danger");
+      }
+      if (this.isAdmin) btn("Удалить", () => this.deleteIncident(card), "btn-danger");
+    }
+    if (["node", "segment", "unclassified", "cable", "closure", "cross", "incident"].includes(card.type)) {
       btn("История", () => this.history(card), "btn-ghost");
     }
     return box.childElementCount ? box : null;
@@ -339,6 +352,56 @@ export class Editor {
     }
   }
 
+  // ---------- повреждения ----------
+
+  async markActual(card) {
+    const pos = await this._startPick("point",
+      "Щёлкните на карте место, где повреждение оказалось на самом деле. Ошибка прогноза посчитается сама.");
+    if (!pos) return;
+    try {
+      const r = await api(`/api/incidents/${card.id}/actual`, { method: "POST", body: pos });
+      await this.ctx.reload();
+      this.ctx.reopen("incident", card.id);
+      const a = r.actual;
+      this.ctx.toast(`Отмечено. Ошибка прогноза: ${Math.round(a.route_error_m)} м по трассе` +
+        (a.within_interval ? " — в пределах интервала" : " — вне интервала") +
+        (a.off_route_m > 50 ? `; точка в ${Math.round(a.off_route_m)} м от трассы` : ""));
+    } catch (e) {
+      this.ctx.toast(e.message);
+    }
+  }
+
+  incidentForm(card) {
+    const e = card.edit;
+    this._form(card, "Изменить повреждение", [
+      field("Название", el("input", { name: "title", value: e.title ?? "" })),
+      field("Примечание", el("textarea", { name: "note", rows: 3 }, e.note ?? "")),
+    ], (fd) => api(`/api/incidents/${card.id}`, { method: "PATCH",
+      body: { title: fd.get("title"), note: fd.get("note") } }));
+  }
+
+  async incidentStatus(card, status) {
+    if (status === "cancelled" && !confirm("Отменить повреждение (например, ложная тревога)?")) return;
+    try {
+      await api(`/api/incidents/${card.id}`, { method: "PATCH", body: { status } });
+      await this.ctx.reload();
+      this.ctx.reopen("incident", card.id);
+    } catch (e) {
+      this.ctx.toast(e.message);
+    }
+  }
+
+  async deleteIncident(card) {
+    if (!confirm(`Удалить «${card.title}» из журнала?`)) return;
+    try {
+      await api(`/api/incidents/${card.id}`, { method: "DELETE" });
+      this.ctx.closeCard();
+      await this.ctx.reload();
+    } catch (e) {
+      this.ctx.toast(e.message);
+    }
+  }
+
   // ---------- документы ----------
 
   async documents(card) {
@@ -508,7 +571,7 @@ export class Editor {
 
   async history(card) {
     const entity = { node: "network_node", segment: "route_segment", unclassified: "unclassified_feature",
-      cable: "cable", closure: "closure", cross: "optical_cross" }[card.type];
+      cable: "cable", closure: "closure", cross: "optical_cross", incident: "incident" }[card.type];
     const rows = await api("/api/audit", { params: { entity_type: entity, entity_id: card.id } });
     const body = document.getElementById("card-body");
     const list = rows.length ? rows.map((r) => {

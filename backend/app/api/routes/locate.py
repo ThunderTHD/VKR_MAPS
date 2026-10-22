@@ -70,7 +70,7 @@ def locate(data: LocateIn, db: Session = Depends(get_db), user: AppUser = Depend
         if user.role not in (Role.admin, Role.installer):
             raise HTTPException(403, "Сохранять повреждения могут монтажник и администратор")
         inc = _run(db, localization.save_incident, db, result, title=data.title, fiber_id=fiber_id, port_id=port_id,
-                   distance_m=data.distance_m, ior=data.ior_set, user_id=user.id)
+                   distance_m=data.distance_m, ior=data.ior_set, user_id=user.id, entry=data.end)
         result["incident_id"] = inc.id
     return result
 

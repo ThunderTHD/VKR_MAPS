@@ -36,6 +36,9 @@ jobs:
         run: pip install -e ".[dev]"  # из исходников: приложение видит ../frontend
       - name: Линтер
         run: ruff check .
+      - name: Синтаксис JavaScript (ES-модули интерфейса)
+        working-directory: frontend
+        run: for f in js/*.js; do node --experimental-default-type=module --check "$f" || exit 1; done
       - name: Тесты
         shell: bash
         run: |
