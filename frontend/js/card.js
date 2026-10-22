@@ -47,6 +47,9 @@ export function renderCard(root, data, onOpen, actions = null) {
     );
   }
 
+  // Документы заполняются отдельно (edit.js), место для них — перед длинной таблицей
+  body.append(el("div", { id: "card-docs" }));
+
   // Таблица (рассветка, порты) — последней: она длинная, ссылки должны быть видны сразу
   if (data.table && data.table.rows.length) {
     body.append(

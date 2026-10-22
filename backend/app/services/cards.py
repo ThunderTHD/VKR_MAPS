@@ -163,6 +163,7 @@ def closure_card(db: Session, closure_id: int) -> dict | None:
         "fields": [["Номер", cl.number], ["Модель", cl.model],
                    ["Оператор", cl.operator.short_name if cl.operator else None],
                    ["Сварок", len(rows)], ["Кабелей", len(cables)], ["Примечание", cl.note]],
+        "edit": {"number": cl.number, "model": cl.model, "operator_id": cl.operator_id, "note": cl.note},
         "sections": [{"title": "Узел", "items": [_ref("node", cl.node_id, _node_label(cl.node))]},
                      {"title": "Кабели в муфте", "items": [_ref("cable", i, n) for i, n in cable_refs]}],
         "table": {
@@ -186,6 +187,8 @@ def cross_card(db: Session, cross_id: int) -> dict | None:
         "type": "cross", "id": x.id, "title": x.name, "subtitle": _node_label(x.node),
         "lonlat": _lonlat(db, x.node.geom),
         "fields": [["Модель", x.model], ["Портов", x.port_count], ["Занято", len(rows)], ["Разъём", x.connector]],
+        "edit": {"name": x.name, "model": x.model, "connector": x.connector, "port_count": x.port_count,
+                 "operator_id": x.operator_id},
         "sections": [{"title": "Узел", "items": [_ref("node", x.node_id, _node_label(x.node))]}],
         "table": {"title": "Порты", "columns": ["Порт", "Кабель", "ОВ", "Цвет", "Примечание"],
                   "rows": [list(r) for r in rows]},

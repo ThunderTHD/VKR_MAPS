@@ -68,6 +68,7 @@ async function openObject(type, id, { fly = true } = {}) {
   try {
     const data = await api(`/api/objects/${type}/${id}`);
     renderCard(card, data, (t, i) => openObject(t, i), editor.actions(data));
+    editor.documents(data);
     const bounds = layers.highlightObject(type, id);
     if (fly) {
       if (bounds && bounds.isValid()) {

@@ -476,3 +476,114 @@ body.drawing .leaflet-draw-pane .leaflet-marker-draggable { cursor: grab; }
 .edit-form .toggle input { width: 20px; height: 20px; min-height: 0; padding: 0; flex: none; }
 .draw-panel .form-actions { position: sticky; bottom: -18px; margin-bottom: -18px; padding: 12px 0 18px;
   background: var(--surface); }
+
+/* ---------- Рассветка муфты (этап 6) ---------- */
+
+.splice-page { min-height: 100vh; background: var(--bg); }
+.splice-head {
+  position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  padding: 10px 20px; background: var(--surface); border-bottom: 1px solid var(--line);
+}
+.splice-head .brand { color: inherit; text-decoration: none; }
+.splice-title { flex: 1; min-width: 180px; }
+.splice-title h1 { margin: 0; font-size: 19px; }
+.splice-tools { display: flex; gap: 6px; flex-wrap: wrap; }
+.splice-tools .btn { text-decoration: none; display: inline-flex; align-items: center; }
+.splice-main { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 18px; padding: 18px 20px 40px;
+  max-width: 1500px; margin: 0 auto; }
+.splice-side { display: grid; gap: 4px; align-content: start; }
+.splice-side section, .splice-work {
+  background: var(--surface); border-radius: var(--radius); padding: 4px 16px 16px; box-shadow: 0 1px 2px #0001;
+}
+.splice-side h2, .splice-work h2 { margin: 14px 0 8px; font-size: 13px; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--muted); }
+.splice-side section + section { margin-top: 10px; }
+.cable-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.cable-item { padding: 6px 8px; border-radius: 10px; border: 1px solid transparent; }
+.cable-item.on { border-color: var(--accent); background: var(--surface-2); }
+.cable-item .link { padding: 0; min-height: 0; text-align: left; width: 100%; display: block; }
+.cable-item .btn { margin-top: 8px; }
+.edit-form.compact .field { margin-top: 6px; }
+.edit-form.compact input, .edit-form.compact select { min-height: 38px; }
+.split-form { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+
+.splice-work { min-width: 0; }
+.pair-pickers { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 160px; padding-top: 12px; }
+.pair-pickers select { min-height: 40px; padding: 0 8px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--surface-2); color: var(--fg); font: inherit; width: 100%; }
+.hint { min-height: 1.4em; margin: 10px 0; }
+
+.diagram { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 160px minmax(0, 1fr); }
+.fiber-col { display: grid; align-content: start; gap: 3px; min-width: 0; grid-column: 1; grid-row: 1; }
+.fiber-col.right { grid-column: 3; }
+.col-head { height: 44px; padding: 2px 4px; overflow: hidden; }
+.fiber-row {
+  display: grid; grid-template-columns: 6px 16px 26px minmax(60px, auto) 1fr; align-items: center; gap: 8px;
+  height: 30px; padding: 0 10px 0 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface);
+  color: var(--fg); font: inherit; font-size: 14px; text-align: left; cursor: pointer; overflow: hidden;
+}
+.fiber-col.right .fiber-row { grid-template-columns: 1fr minmax(60px, auto) 26px 16px 6px; padding: 0 0 0 10px; }
+.fiber-col.right .fiber-row > :nth-child(1) { order: 5; }
+.fiber-col.right .fiber-row > :nth-child(2) { order: 4; }
+.fiber-col.right .fiber-row > :nth-child(3) { order: 3; text-align: right; }
+.fiber-col.right .fiber-row > :nth-child(4) { order: 2; text-align: right; }
+.fiber-col.right .fiber-row > :nth-child(5) { order: 1; text-align: left; }
+.fiber-row .module { align-self: stretch; }
+.fiber-row .num { font-weight: 700; font-variant-numeric: tabular-nums; }
+.fiber-row .fstate { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fiber-row:hover { border-color: var(--accent); }
+.fiber-row.st-free .fstate { color: var(--ok); }
+.fiber-row.st-port, .fiber-row.st-elsewhere { background: var(--surface-2); }
+.fiber-row.pending { outline: 3px solid #ffb703; outline-offset: -1px; }
+.dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 1px solid #0004;
+  vertical-align: -2px; flex: none; }
+.splice-links { position: absolute; top: 0; bottom: 0; left: calc((100% - 160px) / 2); width: 160px; height: 100%;
+  overflow: visible; pointer-events: none; }
+.link-line { cursor: pointer; pointer-events: visibleStroke; }
+.link-line .hit { pointer-events: stroke; }
+.link-line .casing { fill: none; stroke: #14213d; stroke-width: 5; opacity: 0.55; }
+.link-line .core { fill: none; stroke-width: 3; }
+.link-line .hit { fill: none; stroke: transparent; stroke-width: 12; }
+.link-line:hover .casing { stroke: #ffb703; opacity: 1; }
+
+.table-title { margin-top: 26px !important; }
+.splice-table tr.clickable { cursor: pointer; }
+.splice-table tr.clickable:hover td, .splice-table tr.on td { background: var(--surface-2); }
+.detail-end { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 14px; }
+.swap { margin: 2px 0 2px 4px; }
+
+@media (max-width: 900px) {
+  .splice-main { grid-template-columns: minmax(0, 1fr); padding: 12px; }
+  .splice-side { order: 2; }
+  .diagram { grid-template-columns: minmax(0, 1fr) 60px minmax(0, 1fr); }
+  .splice-links { left: calc((100% - 60px) / 2); width: 60px; }
+  .pair-pickers { gap: 8px 60px; }
+  .fiber-row { grid-template-columns: 5px 14px 22px 1fr; }
+  .fiber-row .fcolor { display: none; }
+  .fiber-col.right .fiber-row { grid-template-columns: 1fr 14px 5px; }
+  .fiber-row .fstate { display: none; }
+}
+
+@media print {
+  .splice-head .splice-tools, .splice-side, .pair-pickers, .hint, .no-print, .toast { display: none !important; }
+  .splice-main { display: block; padding: 0; }
+  .splice-work { box-shadow: none; padding: 0; }
+  .splice-head { position: static; border: 0; }
+  .fiber-row { break-inside: avoid; }
+  .data-table { white-space: normal; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+/* ---------- Документы в карточке ---------- */
+
+.docs { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.docs li { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; padding: 6px 8px;
+  border-radius: 8px; background: var(--surface-2); font-size: 14px; }
+.docs a { color: inherit; overflow-wrap: anywhere; font-weight: 600; }
+.docs .meta { grid-column: 1; color: var(--muted); font-size: 12px; }
+.docs .btn { grid-row: 1 / span 2; grid-column: 2; }
+.doc-upload { display: grid; gap: 6px; margin-top: 8px; }
+.doc-upload input[type=file] { font: inherit; font-size: 13px; max-width: 100%; }
+.doc-upload select { min-height: 36px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2);
+  color: var(--fg); font: inherit; padding: 0 8px; }
+a.btn { text-decoration: none; display: inline-flex; align-items: center; }

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Рассветка — ГИС ВОЛС</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body class="splice-page">
+  <header class="splice-head">
+    <a href="/" class="brand" title="К карте"><span class="brand-mark" aria-hidden="true"></span><span class="brand-text">ГИС ВОЛС</span></a>
+    <div class="splice-title">
+      <h1 id="title">Рассветка</h1>
+      <div id="subtitle" class="muted small"></div>
+    </div>
+    <div class="splice-tools">
+      <a id="btn-map" class="btn btn-small" href="/">На карте</a>
+      <a id="btn-csv" class="btn btn-small" href="#" download>CSV для Excel</a>
+      <button id="btn-print" class="btn btn-small" type="button">Печать</button>
+    </div>
+  </header>
+
+  <main class="splice-main">
+    <aside class="splice-side" aria-label="Кабели и действия">
+      <section>
+        <h2>Кабели в муфте</h2>
+        <ul id="cables" class="cable-list"></ul>
+        <p id="no-cables" class="muted small" hidden>В узле не начинается и не заканчивается ни один кабель.</p>
+      </section>
+      <section id="transit-box" hidden>
+        <h2>Проходят транзитом</h2>
+        <p class="muted small">Чтобы сварить волокна такого кабеля, его нужно разрезать в муфте. Все волокна
+          сразу соединятся транзитными сварками — затем любую из них можно заменить ответвлением.</p>
+        <ul id="transit" class="cable-list"></ul>
+      </section>
+      <section id="bulk-box" hidden>
+        <h2>Сварить подряд</h2>
+        <form id="bulk" class="edit-form compact">
+          <div class="field-row">
+            <label class="field">Слева с ОВ <input name="from_a" type="number" min="1" value="1" required></label>
+            <label class="field">Справа с ОВ <input name="from_b" type="number" min="1" value="1" required></label>
+          </div>
+          <label class="field">Количество <input name="count" type="number" min="1" value="1" required></label>
+          <label class="field">Примечание <input name="note" placeholder="куда идёт сигнал"></label>
+          <button class="btn btn-primary btn-small" type="submit">Сварить</button>
+        </form>
+      </section>
+      <section id="detail-box" hidden>
+        <h2>Сварка</h2>
+        <div id="detail"></div>
+      </section>
+      <section>
+        <h2>Замечания</h2>
+        <ul id="issues" class="warnings"></ul>
+      </section>
+    </aside>
+
+    <section class="splice-work">
+      <div class="pair-pickers">
+        <label class="field">Слева <select id="left"></select></label>
+        <label class="field">Справа <select id="right"></select></label>
+      </div>
+      <p id="hint" class="muted small hint"></p>
+      <div id="diagram" class="diagram" aria-label="Схема сварок выбранной пары кабелей">
+        <div id="col-left" class="fiber-col"></div>
+        <svg id="links" class="splice-links" aria-hidden="true"></svg>
+        <div id="col-right" class="fiber-col right"></div>
+      </div>
+
+      <h2 class="table-title">Все сварки муфты <span id="splice-count" class="muted"></span></h2>
+      <div class="table-scroll">
+        <table class="data-table splice-table">
+          <thead><tr><th>Кабель A</th><th>ОВ</th><th></th><th>Кабель Б</th><th>ОВ</th><th></th>
+            <th>Потери, дБ</th><th>Примечание</th><th class="no-print"></th></tr></thead>
+          <tbody id="splices"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script type="module" src="js/splice.js"></script>
+</body>
+</html>

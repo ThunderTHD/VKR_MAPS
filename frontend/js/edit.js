@@ -4,11 +4,15 @@ import { api } from "./api.js";
 
 const ACTION_RU = { update: "изменение", move: "перенос", merge: "объединение", delete: "удаление",
   classify: "назначение типа", import: "импорт", create: "создание", login: "вход", reshape: "изменение формы",
-  split: "вставка точки", reroute: "перекладка" };
+  split: "вставка точки / разрез", reroute: "перекладка", splice: "сварка", unsplice: "разварка",
+  connect: "подключение портов", disconnect: "отключение портов", attach: "документ добавлен",
+  detach: "документ удалён" };
 const FIELD_RU = { kind: "тип", code: "код", name: "название", owner_id: "владелец", address: "адрес",
   note: "примечание", fact_length_m: "длина, м", length_source: "источник длины", length_note: "комментарий",
   channels_total: "каналов", lon: "долгота", lat: "широта", operator_id: "оператор", twist_factor: "укрутка",
-  lay_year: "год прокладки", length_m: "длина, м", vertices: "изгибов", segments: "участков" };
+  lay_year: "год прокладки", length_m: "длина, м", vertices: "изгибов", segments: "участков", number: "номер",
+  model: "модель", connector: "разъём", port_count: "портов", a: "волокно A", b: "волокно Б", ports: "порты",
+  fibers: "волокна", cable: "кабель", filename: "файл", new_name: "новый кабель" };
 
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
@@ -27,6 +31,10 @@ function select(name, options, value, { empty } = {}) {
   for (const [v, label] of options) s.append(new Option(label, v, false, String(v) === String(value ?? "")));
   return s;
 }
+
+const DOC_OWNERS = ["node", "segment", "cable", "closure", "cross", "access_node"];
+const DOC_KIND_RU = { splice_scheme: "Схема рассветки", route_scheme: "Схема трассы", passport: "Паспорт",
+  act: "Акт", asbuilt: "Исполнительная документация", photo: "Фото", other: "Прочее" };
 
 function field(label, control) {
   return el("label", { class: "field" }, label, control);
@@ -68,6 +76,8 @@ export class Editor {
       onclick: fn }, label));
     if (card.type === "node" && this.isAdmin) {
       btn("Изменить", () => this.nodeForm(card));
+      btn("Поставить муфту", () => this.closureForm(card, null));
+      btn("Поставить кросс", () => this.crossForm(card, null));
       btn("Переместить", () => this.moveNode(card));
       btn("Объединить с…", () => this.mergeNode(card));
       btn("Удалить", () => this.deleteNode(card), "btn-danger");
@@ -85,10 +95,24 @@ export class Editor {
       btn("Перепроложить", () => this.ctx.draw.reroute(card));
       btn("Удалить", () => this.deleteCable(card), "btn-danger");
     }
+    if (card.type === "closure") {
+      box.append(el("a", { class: "btn btn-small btn-primary", href: `/splice.html?closure=${card.id}` }, "Рассветка"));
+      if (this.isAdmin) {
+        btn("Изменить", () => this.closureForm(card, card));
+        btn("Удалить", () => this.deleteClosure(card), "btn-danger");
+      }
+    }
+    if (card.type === "cross") {
+      if (this.isAdmin || this.isInstaller) btn("Подключить волокна", () => this.portsForm(card));
+      if (this.isAdmin) {
+        btn("Изменить", () => this.crossForm(card, card));
+        btn("Удалить", () => this.deleteCross(card), "btn-danger");
+      }
+    }
     if (card.type === "unclassified" && this.isAdmin) {
       btn("Назначить тип", () => this.classifyForm(card));
     }
-    if (["node", "segment", "unclassified", "cable"].includes(card.type)) {
+    if (["node", "segment", "unclassified", "cable", "closure", "cross"].includes(card.type)) {
       btn("История", () => this.history(card), "btn-ghost");
     }
     return box.childElementCount ? box : null;
@@ -196,6 +220,175 @@ export class Editor {
     } catch (e) {
       this.ctx.toast(e.message);
     }
+  }
+
+  // ---------- муфты и кроссы ----------
+
+  /** Новая муфта в узле (card — узел) или правка существующей (existing — карточка муфты). */
+  closureForm(card, existing) {
+    const e = existing?.edit || {};
+    const ops = this.ctx.ref.operators.map((o) => [o.id, o.name]);
+    this._form(card, existing ? "Изменить муфту" : "Новая муфта в узле", [
+      field("Номер", el("input", { name: "number", value: e.number ?? "", required: true, placeholder: "М1, М 17/10" })),
+      field("Модель", el("input", { name: "model", value: e.model ?? "", placeholder: "МОГ-У, МТОК…" })),
+      field("Оператор", select("operator_id", ops, e.operator_id, { empty: "не указан" })),
+      field("Примечание", el("textarea", { name: "note", rows: 2 }, e.note ?? "")),
+    ], async (fd) => {
+      const body = { number: fd.get("number"), model: fd.get("model") || null,
+        operator_id: Number(fd.get("operator_id")) || null, note: fd.get("note") || null };
+      if (existing) return api(`/api/closures/${card.id}`, { method: "PATCH", body });
+      const r = await api("/api/closures", { method: "POST", body: { ...body, node_id: card.id } });
+      card.type = "closure";
+      card.id = r.id;
+    });
+  }
+
+  crossForm(card, existing) {
+    const e = existing?.edit || {};
+    const ops = this.ctx.ref.operators.map((o) => [o.id, o.name]);
+    this._form(card, existing ? "Изменить кросс" : "Новый кросс в узле", [
+      field("Название", el("input", { name: "name", value: e.name ?? "ODF-1", required: true })),
+      field("Портов", el("input", { name: "port_count", type: "number", min: "1", max: "288", required: true,
+        value: e.port_count ?? 24 })),
+      field("Разъём", el("input", { name: "connector", value: e.connector ?? "SC/UPC" })),
+      field("Модель", el("input", { name: "model", value: e.model ?? "" })),
+      field("Оператор", select("operator_id", ops, e.operator_id, { empty: "не указан" })),
+      existing ? el("p", { class: "muted small" }, "Уменьшить число портов можно, только если лишние свободны.") : null,
+    ].filter(Boolean), async (fd) => {
+      const body = { name: fd.get("name"), port_count: Number(fd.get("port_count")),
+        connector: fd.get("connector") || null, model: fd.get("model") || null,
+        operator_id: Number(fd.get("operator_id")) || null };
+      if (existing) return api(`/api/crosses/${card.id}`, { method: "PATCH", body });
+      const r = await api("/api/crosses", { method: "POST", body: { ...body, node_id: card.id } });
+      card.type = "cross";
+      card.id = r.id;
+    });
+  }
+
+  async portsForm(card) {
+    const sheet = await api(`/api/crosses/${card.id}/sheet`);
+    const firstFree = (sheet.ports.find((p) => !p.fiber) || {}).port_no || 1;
+    if (!sheet.cables.length) {
+      this.ctx.toast("В этом узле не начинается и не заканчивается ни один кабель");
+      return;
+    }
+    const cables = sheet.cables.map((c) => [`${c.id}:${c.end}`,
+      `${c.name} — ${c.end === "a" ? "начало" : "конец"} (${c.fibers} ОВ)`]);
+    this._form(card, "Подключить волокна к портам", [
+      field("Кабель", select("cable", cables, cables[0][0])),
+      el("div", { class: "field-row" },
+        field("С волокна", el("input", { name: "fiber_from", type: "number", min: "1", value: 1, required: true })),
+        field("На порт", el("input", { name: "port_from", type: "number", min: "1", max: sheet.cross.port_count,
+          value: firstFree, required: true }))),
+      field("Сколько подряд", el("input", { name: "count", type: "number", min: "1", value: 1, required: true })),
+      el("p", { class: "muted small" }, `Свободно портов: ${sheet.ports.filter((p) => !p.fiber).length} из `,
+        `${sheet.cross.port_count}. Отключить порты — ниже.`),
+    ], (fd) => {
+      const [cableId, end] = fd.get("cable").split(":");
+      return api(`/api/crosses/${card.id}/connect`, { method: "POST", body: { cable_id: Number(cableId), end,
+        fiber_from: Number(fd.get("fiber_from")), port_from: Number(fd.get("port_from")),
+        count: Number(fd.get("count")) } });
+    });
+    // Отключение — отдельной маленькой формой под основной
+    const off = el("form", { class: "edit-form" }, el("h3", {}, "Отключить порты"),
+      el("div", { class: "field-row" },
+        field("С порта", el("input", { name: "port_from", type: "number", min: "1", value: 1, required: true })),
+        field("Сколько", el("input", { name: "count", type: "number", min: "1", value: 1, required: true }))),
+      el("div", { class: "form-actions" }, el("button", { type: "submit", class: "btn btn-small btn-danger" }, "Отключить")));
+    off.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const fd = new FormData(off);
+      try {
+        const r = await api(`/api/crosses/${card.id}/disconnect`, { method: "POST", body: {
+          port_from: Number(fd.get("port_from")), count: Number(fd.get("count")) } });
+        this.ctx.toast(`Отключено портов: ${r.count}`);
+        this.ctx.reopen("cross", card.id);
+      } catch (err) {
+        this.ctx.toast(err.message);
+      }
+    });
+    document.getElementById("card-body").append(off);
+  }
+
+  async deleteClosure(card) {
+    const splices = card.fields.find(([k]) => k === "Сварок")?.[1] || 0;
+    if (!confirm(`Удалить ${card.title}${splices ? ` вместе со сварками (${splices})` : ""}?`)) return;
+    try {
+      await api(`/api/closures/${card.id}`, { method: "DELETE" });
+      this.ctx.closeCard();
+      await this.ctx.reload();
+      this.ctx.toast("Муфта удалена");
+    } catch (e) {
+      this.ctx.toast(e.message);
+    }
+  }
+
+  async deleteCross(card) {
+    if (!confirm(`Удалить кросс «${card.title}»? Подключённые волокна будут отключены.`)) return;
+    try {
+      await api(`/api/crosses/${card.id}`, { method: "DELETE" });
+      this.ctx.closeCard();
+      await this.ctx.reload();
+      this.ctx.toast("Кросс удалён");
+    } catch (e) {
+      this.ctx.toast(e.message);
+    }
+  }
+
+  // ---------- документы ----------
+
+  async documents(card) {
+    const box = document.getElementById("card-docs");
+    if (!box || !DOC_OWNERS.includes(card.type)) return;
+    let docs;
+    try {
+      docs = await api("/api/documents", { params: { owner_type: card.type, owner_id: card.id } });
+    } catch {
+      return;
+    }
+    if (document.getElementById("card-docs") !== box) return; // карточку уже сменили
+    const canUpload = this.isAdmin || this.isInstaller;
+    if (!docs.length && !canUpload) return;
+    const size = (b) => (b > 1048576 ? `${(b / 1048576).toFixed(1)} МБ` : `${Math.max(1, Math.round(b / 1024))} КБ`);
+    const list = el("ul", { class: "docs" }, docs.map((d) => el("li", {},
+      el("a", { href: `/api/documents/${d.id}/file`, target: "_blank", rel: "noopener" }, d.filename),
+      el("span", { class: "meta" }, [d.kind_ru, size(d.size), new Date(d.created_at).toLocaleDateString("ru-RU"),
+        d.user, d.note].filter(Boolean).join(" · ")),
+      this.isAdmin ? el("button", { type: "button", class: "btn btn-small btn-ghost", title: "Удалить документ",
+        onclick: async () => {
+          if (!confirm(`Удалить документ «${d.filename}»?`)) return;
+          try {
+            await api(`/api/documents/${d.id}`, { method: "DELETE" });
+            this.documents(card);
+          } catch (e) {
+            this.ctx.toast(e.message);
+          }
+        } }, "✕") : null)));
+    const parts = [el("h3", {}, `Документы${docs.length ? ` (${docs.length})` : ""}`), docs.length ? list : null];
+    if (canUpload) {
+      const file = el("input", { type: "file", name: "file", required: true,
+        accept: ".pdf,.png,.jpg,.jpeg,.gif,.webp,.doc,.docx,.xls,.xlsx,.odt,.ods,.txt,.csv,.sor,.kml,.kmz,.dwg,.dxf,.zip,.7z,.rar" });
+      const kinds = Object.entries(DOC_KIND_RU);
+      const form = el("form", { class: "doc-upload" }, file,
+        select("kind", kinds, card.type === "closure" ? "splice_scheme" : "other"),
+        el("input", { name: "note", placeholder: "Комментарий (необязательно)", class: "doc-note" }),
+        el("button", { type: "submit", class: "btn btn-small" }, "Прикрепить файл"));
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const fd = new FormData(form);
+        fd.append("owner_type", card.type);
+        fd.append("owner_id", card.id);
+        try {
+          await api("/api/documents", { method: "POST", body: fd });
+          this.ctx.toast("Файл прикреплён");
+          this.documents(card);
+        } catch (err) {
+          this.ctx.toast(err.message);
+        }
+      });
+      parts.push(form);
+    }
+    box.replaceChildren(...parts.filter(Boolean));
   }
 
   classifyForm(card) {
@@ -311,7 +504,7 @@ export class Editor {
 
   async history(card) {
     const entity = { node: "network_node", segment: "route_segment", unclassified: "unclassified_feature",
-      cable: "cable" }[card.type];
+      cable: "cable", closure: "closure", cross: "optical_cross" }[card.type];
     const rows = await api("/api/audit", { params: { entity_type: entity, entity_id: card.id } });
     const body = document.getElementById("card-body");
     const list = rows.length ? rows.map((r) => {
