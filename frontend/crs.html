@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#14213d">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="/img/icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="/img/icons/apple-touch-icon.png">
+  <title>Системы координат — ГИС ВОЛС</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body class="splice-page">
+  <header class="splice-head">
+    <a href="/" class="brand" title="К карте"><span class="brand-mark" aria-hidden="true"></span><span class="brand-text">ГИС ВОЛС</span></a>
+    <div class="splice-title"><h1>Системы координат</h1>
+      <div class="muted small">МСК субъекта, UTM и др. — для импорта и экспорта Shapefile, координат в карточках и поиска по X/Y</div></div>
+    <div class="splice-tools"><a class="btn btn-small" href="/">Карта</a></div>
+  </header>
+  <main class="page-wide">
+    <section class="page-card">
+      <p>Сеть хранится в WGS 84 (широта/долгота). Чтобы принимать и отдавать данные в местной системе координат
+        (МСК-16 и т. п.), добавьте её здесь. <b>Проще всего — загрузить файл .prj</b> из любой выгрузки этой системы
+        (5Gis, QGIS, MapInfo, AutoCAD Map сохраняют его рядом с Shapefile). Можно вставить и текст: WKT, строку
+        <code>+proj=…</code> или код вида <code>EPSG:32639</code>.</p>
+      <p class="muted small">Параметры МСК официально не публикуются — берите их из геоданных вашей организации.
+        Ошибка в параметрах сдвинет все объекты, поэтому после добавления проверьте по известной точке: координаты
+        из карточки колодца должны совпасть с его координатами в документах.</p>
+      <form id="add" class="edit-form compact">
+        <label class="field">Название <input name="name" placeholder="например, МСК-16 зона 2 (берётся из .prj, если пусто)"></label>
+        <label class="field">Файл .prj <input name="prj" type="file" accept=".prj,text/plain"></label>
+        <label class="field">или определение (WKT / proj / EPSG)
+          <textarea name="definition" rows="4" placeholder='PROJCS["…",…] или +proj=tmerc … или EPSG:32639'></textarea></label>
+        <label class="toggle small"><input name="show_in_cards" type="checkbox" checked> показывать координаты в карточках объектов</label>
+        <p id="err" class="form-error" hidden></p>
+        <div class="form-actions"><button class="btn btn-primary" type="submit">Добавить</button></div>
+      </form>
+    </section>
+    <section class="page-card">
+      <h2>Добавленные системы</h2>
+      <ul id="list" class="plain-list"></ul>
+      <p class="muted small">Поиск по координатам: в строке поиска на карте введите X и Y в местной системе
+        (например, <code>6170154.30 1345678.12</code>) или широту и долготу (<code>55.674239, 52.330327</code>).</p>
+    </section>
+  </main>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script type="module" src="js/crs.js"></script>
+  <script type="module" src="/js/pwa.js"></script>
+</body>
+</html>

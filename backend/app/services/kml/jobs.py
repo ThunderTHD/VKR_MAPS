@@ -12,9 +12,11 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.models import Document, DocumentKind, ImportJob, ImportKind, ImportStatus
+from app.models import CrsDef, Document, DocumentKind, ImportJob, ImportKind, ImportStatus
 from app.services.kml.importer import FolderMapping, commit_plan, plan_import, suggest_mapping
-from app.services.kml.parser import KmlError, parse_kml
+from app.services.kml.parser import KmlDocument, KmlError, parse_kml
+from app.services.kml.shp_source import parse_shapefile
+from app.services.shapefile_io import is_shapefile_zip
 
 MAX_KML_BYTES = 50 * 1024 * 1024
 
@@ -43,13 +45,30 @@ def read_document(doc: Document) -> bytes:
     return (get_settings().upload_dir / doc.path).read_bytes()
 
 
-def create_job(db: Session, filename: str, data: bytes, user_id: int | None) -> ImportJob:
+def parse_source(db: Session, data: bytes, crs_id: int | None = None) -> tuple[KmlDocument, ImportKind]:
+    """KML/KMZ или Shapefile (zip) — в общий вид «папки и объекты» для импорта."""
+    if is_shapefile_zip(data):
+        definition = None
+        if crs_id:
+            c = db.get(CrsDef, crs_id)
+            if c is None:
+                raise KmlError("Система координат не найдена")
+            definition = c.definition
+        return parse_shapefile(db, data, definition), ImportKind.shp
+    return parse_kml(data), ImportKind.kml
+
+
+def _source(db: Session, job: ImportJob) -> KmlDocument:
+    return parse_source(db, read_document(db.get(Document, job.document_id)), job.crs_id)[0]
+
+
+def create_job(db: Session, filename: str, data: bytes, user_id: int | None, crs_id: int | None = None) -> ImportJob:
     if len(data) > MAX_KML_BYTES:
         raise KmlError("Файл больше 50 МБ")
-    kml = parse_kml(data)  # проверка, что файл читается, — до сохранения
+    kml, kind = parse_source(db, data, crs_id)  # проверка, что файл читается, — до сохранения
     doc = store_upload(db, filename, data, DocumentKind.other, user_id)
     mapping = suggest_mapping(db, kml)
-    job = ImportJob(kind=ImportKind.kml, filename=filename, document_id=doc.id, user_id=user_id,
+    job = ImportJob(kind=kind, filename=filename, document_id=doc.id, user_id=user_id, crs_id=crs_id,
                     status=ImportStatus.preview, folder_mapping={k: asdict(v) for k, v in mapping.items()})
     db.add(job)
     db.flush()
@@ -66,7 +85,7 @@ def build_preview(db: Session, job: ImportJob, mapping: dict[str, FolderMapping]
     if mapping is not None:
         job.folder_mapping = {k: asdict(v) for k, v in mapping.items()}
     tol = tolerance_m if tolerance_m is not None else get_settings().snap_tolerance_m
-    kml = parse_kml(read_document(db.get(Document, job.document_id)))
+    kml = _source(db, job)
     plan = plan_import(db, kml, _mapping(job), tol)
     preview = {"filename": job.filename, "tolerance_m": tol, "folders": list(kml.folders().values()),
                "mapping": job.folder_mapping, "parse_errors": kml.errors, **plan.to_json(),
@@ -80,7 +99,7 @@ def commit_job(db: Session, job: ImportJob, user_id: int | None) -> dict:
     if job.status != ImportStatus.preview:
         raise KmlError(f"Импорт уже в состоянии «{job.status.value}»")
     tol = (job.preview or {}).get("tolerance_m", get_settings().snap_tolerance_m)
-    kml = parse_kml(read_document(db.get(Document, job.document_id)))
+    kml = _source(db, job)
     mapping = _mapping(job)
     plan = plan_import(db, kml, mapping, tol)
     created = commit_plan(db, plan, job.id, user_id, mapping)

@@ -122,3 +122,70 @@ def to_geojson(db: Session, operator_id: int | None = None) -> bytes:
                                      "color": c["color"]}})
     fc = {"type": "FeatureCollection", "name": "vols", "features": feats}
     return json.dumps(fc, ensure_ascii=False).encode("utf-8")
+
+
+# ------------------------------------------------------------------ Shapefile (этап 13)
+
+
+def _prj_for(db: Session, definition: str | None) -> str | None:
+    """WKT для файла .prj: из определения (если это WKT) или из справочника PostGIS по коду EPSG."""
+    from app.services import shapefile_io
+    if definition is None:
+        return shapefile_io.WGS84_WKT
+    d = definition.strip()
+    if d.upper().startswith(("PROJCS[", "GEOGCS[")):
+        return d
+    if d.upper().startswith("EPSG:"):
+        return db.scalar(sa.text("SELECT srtext FROM spatial_ref_sys WHERE auth_name = 'EPSG' AND auth_srid = :c"),
+                         {"c": int(d.split(":")[1])})
+    return None     # строка proj — .prj не пишем, система указана в readme.txt
+
+
+def to_shapefile(db: Session, operator_id: int | None = None, crs_def=None) -> bytes:
+    """Сеть в Shapefile (zip): точки, участки трассы, кабели. crs_def — CrsDef или None (WGS 84)."""
+    from app.services import crs, shapefile_io
+    Feature = shapefile_io.Feature
+    definition = crs_def.definition if crs_def is not None else None
+
+    def conv(points):
+        return crs.transform(db, points, crs.WGS84, definition) if definition else points
+
+    nodes = _rows(db, NODES_SQL, operator_id)
+    segs = _rows(db, SEGMENTS_SQL, operator_id)
+    cables = _rows(db, CABLES_SQL, operator_id)
+    pts = conv([(n["x"], n["y"]) for n in nodes])
+    node_f = [Feature("Point", [p], {"ID": n["id"], "KIND": NODE_KIND_RU.get(str(n["kind"]), str(n["kind"])),
+                                    "CODE": n["code"], "NAME": n["name"], "ADDRESS": n["address"]})
+              for n, p in zip(nodes, pts, strict=True)]
+
+    def lines(rows):
+        flat = [tuple(c) for r in rows for c in r["gj"]["coordinates"]]
+        out, pos = [], 0
+        conv_flat = conv(flat)
+        for r in rows:
+            k = len(r["gj"]["coordinates"])
+            out.append(conv_flat[pos:pos + k])
+            pos += k
+        return out
+    seg_f = [Feature("LineString", c, {"ID": s["id"], "KIND": SEGMENT_KIND_RU.get(str(s["kind"]), str(s["kind"])),
+                                       "FACT_M": s["fact_length_m"], "GEO_M": round(s["geo_m"], 1),
+                                       "FROM_PT": s["a"], "TO_PT": s["b"]})
+             for s, c in zip(segs, lines(segs), strict=True)]
+    cab_f = [Feature("LineString", c, {"ID": r["id"], "NAME": r["name"], "MARK": r["mark"], "FIBERS": r["fiber_count"],
+                                       "OPERATOR": r["operator"]})
+             for r, c in zip(cables, lines(cables), strict=True)]
+    prj = _prj_for(db, definition)
+    files: dict[str, bytes] = {}
+    for name, kind, feats in (("tochki", "Point", node_f), ("trassa", "LineString", seg_f),
+                              ("kabeli", "LineString", cab_f)):
+        if feats:
+            layer = shapefile_io.write_layer(name, kind, feats, prj or shapefile_io.WGS84_WKT)
+            if prj is None:
+                layer.pop(f"{name}.prj")
+            files.update(layer)
+    crs_name = crs_def.name if crs_def is not None else "WGS 84 (EPSG:4326)"
+    files["readme.txt"] = (f"Сеть ВОЛС, выгрузка из ГИС ВОЛС.\r\nСистема координат: {crs_name}\r\n"
+                           + ("" if prj else f"Определение: {definition}\r\n")
+                           + "Слои: tochki — точки сети, trassa — участки трассы, kabeli — кабели.\r\n"
+                           "Кодировка атрибутов: UTF-8 (файлы .cpg).\r\n").encode("utf-8")
+    return shapefile_io.zip_layers(files)

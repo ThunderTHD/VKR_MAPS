@@ -74,6 +74,7 @@ async function upload(file) {
   status.textContent = `Разбираю «${file.name}»…`;
   const form = new FormData();
   form.append("file", file);
+  if ($("crs").value) form.append("crs_id", $("crs").value);
   try {
     show(await api("/api/imports/kml", { method: "POST", body: form }));
   } catch (e) {
@@ -284,6 +285,7 @@ async function main() {
     map.fitBounds([[y1, x1], [y2, x2]]);
   }
   await Promise.all([loadJobs(), loadExisting()]);
+  for (const c of await api("/api/crs")) $("crs").append(new Option(c.name, c.id));
 }
 
 main().catch((e) => toast(e.message));

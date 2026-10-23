@@ -44,13 +44,14 @@ export class DrawTools {
     this.panel = document.getElementById("draw-panel");
     this.rail = document.getElementById("draw-tools");
 
-    // Кнопки рисования — только администратору; «Повреждение» обслуживает LocateTool
-    if (ctx.user.role === "admin") {
-      this.rail.querySelectorAll(".admin-tool").forEach((b) => {
-        b.hidden = false;
-        b.addEventListener("click", () => this.start(b.dataset.tool));
-      });
-    }
+    // Кнопки рисования — только администратору (перемычку может нарисовать и монтажник);
+    // «Повреждение» обслуживает LocateTool
+    this.rail.querySelectorAll(".admin-tool").forEach((b) => {
+      const allowed = ctx.user.role === "admin" || (b.dataset.tool === "jumper" && ctx.user.role === "installer");
+      if (!allowed) return;
+      b.hidden = false;
+      b.addEventListener("click", () => this.start(b.dataset.tool));
+    });
     this.panel.querySelector("[data-close]")?.addEventListener("click", () => this.stop());
     this.map.on("click", (e) => this.mode && this._onClick(e));
     this.map.on("mousemove", (e) => this.mode && this._onMove(e));
@@ -73,7 +74,7 @@ export class DrawTools {
     this.map.doubleClickZoom.disable();
     this.rail.querySelectorAll(".admin-tool").forEach((b) => b.classList.toggle("active", b.dataset.tool === mode));
     ({ point: () => this._pointPanel(), route: () => this._routePanel(), cable: () => this._cablePanel(),
-      reshape: () => this._reshapeStart(), split: () => this._splitPanel() })[mode]();
+      reshape: () => this._reshapeStart(), split: () => this._splitPanel(), jumper: () => this._jumperPanel() })[mode]();
     if (!this.mode) return; // режим не смог начаться (например, участок не загружен)
     this.panel.hidden = false;
     if (this.map.getZoom() < 16 && mode !== "reshape" && !this.zoomHinted) {
@@ -159,7 +160,7 @@ export class DrawTools {
 
   _onClick(e) {
     const handler = { point: this._pointClick, route: this._routeClick, cable: this._cableClick,
-      split: this._splitClick }[this.mode];
+      split: this._splitClick, jumper: this._jumperClick }[this.mode];
     handler?.call(this, e);
   }
 
@@ -179,6 +180,72 @@ export class DrawTools {
   }
 
   // ---------------------------------------------------------------- точка
+
+  // ---------------------------------------------------------------- перемычка
+
+  _jumperPanel() {
+    this.jumper = { a: null, b: null };
+    this._jumperRender();
+  }
+
+  _jumperRender() {
+    const { a, b } = this.jumper;
+    const step = !a ? "Щёлкните первый объект: муфту, узел доступа, кросс или колодец."
+      : !b ? "Теперь второй объект." : "Подпишите перемычку и сохраните.";
+    const row = (title, o) => el("p", { class: "small" }, el("b", {}, `${title}: `), o ? `${o.type_ru} ${o.label}` : "—");
+    const parts = [el("p", { class: "muted small" }, "Перемычка — линия с подписью между двумя объектами: патч-корд между " +
+      "кроссами, резерв волокон между муфтами. В трассировке не участвует."), el("p", {}, step), row("Откуда", a), row("Куда", b)];
+    if (a && b) {
+      const error = el("p", { class: "form-error", role: "alert", hidden: true });
+      const form = el("form", { class: "edit-form" },
+        field("Подпись", el("input", { name: "label", placeholder: "например, Резерв 24 волокна", maxlength: 200 })),
+        error, this._actions(el("button", { type: "submit", class: "btn btn-primary btn-small" }, "Сохранить"),
+          this._btn("Заново", () => { this.group.clearLayers(); this._jumperPanel(); })));
+      form.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        try {
+          const r = await api("/api/jumpers", { method: "POST", body: { a_type: a.type, a_id: a.id, b_type: b.type,
+            b_id: b.id, label: new FormData(form).get("label") } });
+          this.stop({ silent: true });
+          await this.ctx.reload();
+          this.ctx.openObject("jumper", r.id);
+        } catch (err) {
+          error.textContent = err.message;
+          error.hidden = false;
+        }
+      });
+      parts.push(form);
+      setTimeout(() => form.querySelector("input")?.focus(), 0);
+    }
+    this._setPanel("Перемычка", ...parts);
+  }
+
+  async _jumperClick(e) {
+    if (this.jumper.a && this.jumper.b) return;
+    // Радиус поиска объекта — около 20 пикселей экрана в метрах на текущем масштабе
+    const mpp = (40075016 * Math.cos((e.latlng.lat * Math.PI) / 180)) / 2 ** (this.map.getZoom() + 8);
+    const within = Math.min(Math.max(20 * mpp, 5), 150);
+    const hit = await api("/api/jumpers/nearest", { params: { lon: e.latlng.lng, lat: e.latlng.lat, within_m: within } });
+    if (!hit) {
+      this.ctx.toast("Здесь нет муфты, узла, кросса или колодца — щёлкните ближе к объекту");
+      return;
+    }
+    const ll = [hit.lonlat[1], hit.lonlat[0]];
+    L.circleMarker(ll, { pane: "draw", renderer: this.svg, radius: 9, color: "#7209b7", weight: 3, fillOpacity: 0.2 })
+      .addTo(this.group);
+    if (!this.jumper.a) this.jumper.a = hit;
+    else {
+      if (hit.type === this.jumper.a.type && hit.id === this.jumper.a.id) {
+        this.ctx.toast("Это тот же объект — выберите другой");
+        return;
+      }
+      this.jumper.b = hit;
+      const a = this.jumper.a.lonlat;
+      L.polyline([[a[1], a[0]], ll], { pane: "draw", renderer: this.svg, color: "#7209b7", weight: 3, dashArray: "6 4" })
+        .addTo(this.group);
+    }
+    this._jumperRender();
+  }
 
   _pointPanel() {
     this._setPanel("Новая точка", el("p", { class: "muted small" },

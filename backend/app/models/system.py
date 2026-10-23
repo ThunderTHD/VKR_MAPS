@@ -141,6 +141,20 @@ class ImportJob(TimestampMixin, Base):
     folder_mapping = mapped_column(JSONB, nullable=True)
     preview = mapped_column(JSONB, nullable=True)
     report = mapped_column(JSONB, nullable=True)
+    # Система координат файла, если в нём нет .prj (Shapefile в МСК) — этап 13
+    crs_id: Mapped[int | None] = mapped_column(sa.ForeignKey("crs_def.id", ondelete="SET NULL"))
+
+
+class CrsDef(Base):
+    """Система координат (МСК субъекта, UTM…) — для импорта, экспорта и показа координат."""
+
+    __tablename__ = "crs_def"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(sa.String(120), unique=True)
+    definition: Mapped[str] = mapped_column(sa.Text)
+    show_in_cards: Mapped[bool] = mapped_column(sa.Boolean, server_default=sa.true(), default=True)
+    created_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), server_default=sa.func.now())
 
 
 class FolderTarget(StrEnum):

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#14213d">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="/img/icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="/img/icons/apple-touch-icon.png">
+  <title>Экспорт сети — ГИС ВОЛС</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body class="splice-page">
+  <header class="splice-head">
+    <a href="/" class="brand" title="К карте"><span class="brand-mark" aria-hidden="true"></span><span class="brand-text">ГИС ВОЛС</span></a>
+    <div class="splice-title"><h1>Экспорт сети</h1>
+      <div class="muted small">Для Google Earth, QGIS, 5Gis, AutoCAD Map</div></div>
+    <div class="splice-tools"><a class="btn btn-small" href="/">Карта</a></div>
+  </header>
+  <main class="page-wide">
+    <section class="page-card">
+      <form id="form" class="edit-form compact">
+        <label class="field">Формат
+          <select name="fmt">
+            <option value="kml">KML — Google Earth</option>
+            <option value="zip">Shapefile (zip) — QGIS, 5Gis, MapInfo, AutoCAD Map</option>
+            <option value="geojson">GeoJSON — веб-ГИС, QGIS</option>
+          </select></label>
+        <label class="field">Оператор <select name="operator_id"><option value="">все</option></select></label>
+        <label class="field" id="crs-field" hidden>Система координат
+          <select name="crs_id"><option value="">WGS 84 (широта/долгота)</option></select></label>
+        <div class="form-actions"><button class="btn btn-primary" type="submit">Скачать</button></div>
+      </form>
+      <p class="muted small">Shapefile — три слоя: точки сети, участки трассы, кабели; атрибуты — тип, код, название,
+        длины, марка, оператор. Местные системы координат добавляются в разделе
+        <a href="/crs.html">«Системы координат»</a>.</p>
+    </section>
+  </main>
+  <script type="module">
+    import { api } from "./js/api.js";
+    const f = document.getElementById("form");
+    const params = new URLSearchParams(location.search);
+    const ref = await api("/api/map/reference");
+    for (const o of ref.operators) f.operator_id.append(new Option(o.name || o.short_name, o.id));
+    f.operator_id.value = params.get("operator_id") || "";
+    for (const c of await api("/api/crs")) f.crs_id.append(new Option(c.name, c.id));
+    const sync = () => { document.getElementById("crs-field").hidden = f.fmt.value !== "zip"; };
+    f.fmt.addEventListener("change", sync);
+    sync();
+    f.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const q = new URLSearchParams();
+      if (f.operator_id.value) q.set("operator_id", f.operator_id.value);
+      if (f.fmt.value === "zip" && f.crs_id.value) q.set("crs_id", f.crs_id.value);
+      location.href = `/api/export/network.${f.fmt.value}` + (q.toString() ? `?${q}` : "");
+    });
+  </script>
+  <script type="module" src="/js/pwa.js"></script>
+</body>
+</html>

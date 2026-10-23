@@ -88,7 +88,7 @@ export class MapLayers {
     this.layers.jumpers = L.geoJSON(null, {
       pane: "cables",
       style: { color: "#7209b7", weight: 2, dashArray: "6 4" },
-      onEachFeature: (f, l) => l.bindTooltip(f.properties.label || "Перемычка", { sticky: true }),
+      onEachFeature: (f, l) => this.bind(l, "jumper", f, f.properties.label || "Перемычка"),
     });
     // Повреждения: прогноз (красный) и, если устранено, фактическое место (зелёный) с линией между ними
     this.layers.incidents = L.geoJSON(null, {
@@ -181,7 +181,7 @@ export class MapLayers {
   highlightObject(type, id) {
     this.highlight.clearLayers();
     const source = { segment: "segments", cable: "cables", node: "nodes", closure: "closures",
-      access_node: "access_nodes", unclassified: "unclassified", incident: "incidents" }[type];
+      access_node: "access_nodes", unclassified: "unclassified", incident: "incidents", jumper: "jumpers" }[type];
     const feature = source && this.data[source]?.features.find((f) => f.properties.id === id);
     if (!feature) return null;
     const shape = L.geoJSON(feature, {

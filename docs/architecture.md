@@ -95,6 +95,11 @@ flowchart TB
 | `services/photo_coords`, `photo_points` | EXIF и OCR координат с фото, точки сети по фото | 11 |
 | `services/export` | выгрузка сети в KML и GeoJSON | 11 |
 | `services/evaluation` | эксперимент для ВКР: серии E1–E5 в отдельной базе, отчёт, CSV | 12 |
+| `services/shapefile_io`, `kml/shp_source` | чтение/запись Shapefile, импорт Shapefile через конвейер KML | 13 |
+| `services/crs` | реестр местных систем координат (МСК, UTM), пересчёт средствами PostGIS, поиск по X Y | 13 |
+| `services/overlays` | подложки: PDF/скан → PNG, аффинная привязка по опорным точкам, невязки | 13 |
+| `services/jumpers` | перемычки между муфтами, кроссами и узлами доступа | 13 |
+| `frontend/sw.js`, `manifest.webmanifest` | PWA: установка на телефон, работа без связи | 13 |
 | `services/anonymize`, `tools/generate` | обезличивание реальных данных, генератор сети | 2, 12 |
 
 ## 3. Ключевые потоки данных

@@ -34,6 +34,7 @@ from app.models.system import (
     AppUser,
     AsBuiltPackage,
     AuditLog,
+    CrsDef,
     Document,
     DocumentKind,
     FolderTarget,
@@ -49,7 +50,7 @@ from app.models.system import (
 
 __all__ = [
     "AccessNode", "AppUser", "AsBuiltPackage", "AuditLog", "Base", "Cable", "CableReserve", "CableRoute",
-    "CableType", "CalibrationRun", "Closure", "ColorKind", "ColorScheme", "ColorSchemeEntry", "CrossPort",
+    "CableType", "CalibrationRun", "Closure", "ColorKind", "ColorScheme", "ColorSchemeEntry", "CrossPort", "CrsDef",
     "Document", "DocumentKind", "ExperimentRun", "Fiber", "FiberEnd", "FolderTarget", "ImportJob", "ImportKind",
     "ImportStatus",
     "Incident", "IncidentStatus", "Instrument", "InstrumentKind", "Jumper", "KmlFolderRule", "LengthSource",

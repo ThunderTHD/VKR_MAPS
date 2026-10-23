@@ -1,4 +1,5 @@
 """Карточки объектов (что показывается по клику на карте) и поиск."""
+import re
 from zoneinfo import ZoneInfo
 
 import sqlalchemy as sa
@@ -42,6 +43,21 @@ def _lonlat(db: Session, geom) -> list[float]:
     return [x, y]
 
 
+def _coord_fields(db: Session, lonlat: list[float] | None) -> list[list]:
+    """Координаты точки: WGS 84 и местные системы (МСК), отмеченные для показа в карточках."""
+    if not lonlat:
+        return []
+    from app.services import crs  # здесь: crs импортирует editing, а тот — модели карточек
+    lon, lat = lonlat
+    out = [["Координаты (WGS 84)", f"{lat:.6f}, {lon:.6f}"]]
+    for c in crs.coords_in_all(db, lon, lat):
+        if c["geographic"]:
+            out.append([c["crs"], f"{c['north']:.6f}, {c['east']:.6f}"])
+        else:
+            out.append([c["crs"], f"X (север) {c['north']:.2f}  Y (восток) {c['east']:.2f}"])
+    return out
+
+
 def node_card(db: Session, node_id: int) -> dict | None:
     n = db.get(NetworkNode, node_id)
     if n is None:
@@ -60,6 +76,7 @@ def node_card(db: Session, node_id: int) -> dict | None:
         "fields": [
             ["Тип", NODE_KIND_RU[n.kind.value]], ["Код", n.code], ["Название", n.name],
             ["Владелец", n.owner.short_name if n.owner else None], ["Адрес", n.address], ["Примечание", n.note],
+            *_coord_fields(db, _lonlat(db, n.geom)),
         ],
         "edit": {"kind": n.kind.value, "code": n.code, "name": n.name, "owner_id": n.owner_id,
                  "address": n.address, "note": n.note},
@@ -166,7 +183,8 @@ def closure_card(db: Session, closure_id: int) -> dict | None:
         "lonlat": _lonlat(db, cl.node.geom),
         "fields": [["Номер", cl.number], ["Модель", cl.model],
                    ["Оператор", cl.operator.short_name if cl.operator else None],
-                   ["Сварок", len(rows)], ["Кабелей", len(cables)], ["Примечание", cl.note]],
+                   ["Сварок", len(rows)], ["Кабелей", len(cables)], ["Примечание", cl.note],
+                   *_coord_fields(db, _lonlat(db, cl.node.geom))],
         "edit": {"number": cl.number, "model": cl.model, "operator_id": cl.operator_id, "note": cl.note},
         "sections": [{"title": "Узел", "items": [_ref("node", cl.node_id, _node_label(cl.node))]},
                      {"title": "Кабели в муфте", "items": [_ref("cable", i, n) for i, n in cable_refs]}],
@@ -285,7 +303,12 @@ def incident_card(db: Session, inc_id: int) -> dict | None:
     }
 
 
-CARDS = {"incident": incident_card,
+def jumper_card(db: Session, jumper_id: int) -> dict | None:
+    from app.services import jumpers  # jumpers использует справочники этого модуля
+    return jumpers.card(db, jumper_id)
+
+
+CARDS = {"incident": incident_card, "jumper": jumper_card,
          "unclassified": unclassified_card, "node": node_card, "segment": segment_card, "cable": cable_card,
          "closure": closure_card, "cross": cross_card, "access_node": access_node_card}
 
@@ -325,5 +348,22 @@ def search(db: Session, query: str, limit: int = 20) -> list[dict]:
     normalized = "".join(ch for ch in q if ch not in "№." and not ch.isspace())
     params = {"q": f"%{q}%", "qn": f"%{normalized}%", "limit": limit}
     rows = db.execute(sa.text(SEARCH_SQL), params).mappings().all()
-    return [dict(r) for r in rows]
+    return _coordinate_hits(db, q) + [dict(r) for r in rows]
+
+
+LATLON = re.compile(r"^\s*(-?\d{1,2}[.,]\d+)\s*[;, ]\s*(-?\d{1,3}[.,]\d+)\s*$")
+
+
+def _coordinate_hits(db: Session, q: str) -> list[dict]:
+    """Поиск по координатам: «55.674239, 52.330327» (широта, долгота) или X Y в местной системе."""
+    from app.services import crs
+    m = LATLON.match(q)
+    if m:
+        lat, lon = float(m[1].replace(",", ".")), float(m[2].replace(",", "."))
+        if -90 <= lat <= 90 and -180 <= lon <= 180:
+            return [{"type": "point", "id": 0, "label": f"Точка {lat:.6f}, {lon:.6f} (WGS 84)", "hint": "point",
+                     "lon": lon, "lat": lat}]
+    return [{"type": "point", "id": 0, "label": f"Точка в «{h['crs']}» ({h['order']})"
+             + (f", {h['distance_km']} км от центра сети" if h["distance_km"] is not None else ""),
+             "hint": "point", "lon": h["lon"], "lat": h["lat"]} for h in crs.find_point(db, q)]
 

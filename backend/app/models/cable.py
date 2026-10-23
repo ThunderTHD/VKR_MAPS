@@ -198,7 +198,7 @@ class Jumper(TimestampMixin, Base):
     __tablename__ = "jumper"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    a_type: Mapped[str] = mapped_column(sa.String(30))  # network_node | closure | optical_cross | access_node
+    a_type: Mapped[str] = mapped_column(sa.String(30))  # node | closure | cross | access_node (как типы карточек)
     a_id: Mapped[int] = mapped_column(sa.Integer)
     b_type: Mapped[str] = mapped_column(sa.String(30))
     b_id: Mapped[int] = mapped_column(sa.Integer)

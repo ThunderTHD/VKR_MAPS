@@ -3,7 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Импорт KML — ГИС ВОЛС</title>
+  <meta name="theme-color" content="#14213d">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="/img/icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="/img/icons/apple-touch-icon.png">
+  <title>Импорт KML и Shapefile — ГИС ВОЛС</title>
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="css/app.css">
 </head>
@@ -11,15 +15,20 @@
   <aside class="import-side">
     <header class="import-head">
       <a href="/" class="brand" title="К карте"><span class="brand-mark" aria-hidden="true"></span>ГИС ВОЛС</a>
-      <h1>Импорт KML</h1>
+      <h1>Импорт KML и Shapefile</h1>
     </header>
 
     <!-- Шаг 1. Файл -->
     <section id="step-file" class="step">
       <label id="drop" class="drop">
-        <input id="file" type="file" accept=".kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz">
-        <strong>Выберите файл KML или KMZ</strong>
-        <span class="muted">или перетащите его сюда. Выгрузка из Google Earth подойдёт как есть.</span>
+        <input id="file" type="file" accept=".kml,.kmz,.zip,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz,application/zip">
+        <strong>Выберите файл KML/KMZ или Shapefile (архив .zip)</strong>
+        <span class="muted">или перетащите его сюда. Выгрузка из Google Earth подойдёт как есть. Shapefile — архив zip с
+          файлами .shp, .dbf и .prj (выгрузка 5Gis, QGIS, MapInfo); каждый слой станет папкой.</span>
+      </label>
+      <label class="field inline">Система координат Shapefile, если в архиве нет .prj
+        <select id="crs"><option value="">— из .prj / широта-долгота —</option></select>
+        <a href="/crs.html" class="small">системы координат…</a>
       </label>
       <p id="upload-status" class="muted" hidden></p>
       <h2>Последние импорты</h2>
@@ -78,5 +87,6 @@
   <div id="toast" class="toast" role="status" hidden></div>
   <script src="vendor/leaflet/leaflet.js"></script>
   <script type="module" src="js/import.js"></script>
+  <script type="module" src="/js/pwa.js"></script>
 </body>
 </html>

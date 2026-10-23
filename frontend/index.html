@@ -4,6 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#14213d">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="/img/icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="/img/icons/apple-touch-icon.png">
   <title>ГИС ВОЛС</title>
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="css/app.css">
@@ -31,13 +34,15 @@
         <a href="/incidents.html">Журнал повреждений</a>
         <a href="/monitoring.html">Мониторинг узлов</a>
         <a id="menu-photos" href="/photos.html" hidden>Точки по фото</a>
-        <a id="menu-import" href="/import.html" hidden>Импорт KML</a>
+        <a id="menu-import" href="/import.html" hidden>Импорт KML / Shapefile</a>
         <a id="menu-asbuilt" href="/asbuilt.html" hidden>Пакеты ИД</a>
         <a id="menu-calibration" href="/calibration.html" hidden>Калибровка</a>
         <a id="menu-experiments" href="/experiments.html" hidden>Эксперимент (ВКР)</a>
-        <a id="menu-export-kml" href="/api/export/network.kml" hidden>Экспорт сети в KML</a>
-        <a id="menu-export-geojson" href="/api/export/network.geojson" hidden>Экспорт сети в GeoJSON</a>
+        <a id="menu-export" href="/export.html" hidden>Экспорт сети</a>
+        <a id="menu-crs" href="/crs.html" hidden>Системы координат</a>
+        <a id="menu-overlays" href="/overlays.html" hidden>Подложки (планы)</a>
         <a href="/phone.html">Вход с телефона</a>
+        <button id="menu-install" type="button" hidden>Установить приложение</button>
         <a href="/status.html">Состояние системы</a>
         <a href="/api/docs" target="_blank" rel="noopener">Документация API</a>
         <button id="btn-logout" type="button">Выйти</button>
@@ -66,6 +71,7 @@
       </label>
       <h3>Слои</h3>
       <div id="layer-toggles" class="toggles"></div>
+      <div id="overlay-list" class="toggles"></div>
       <h3>Владельцы трасс</h3>
       <ul id="legend-owners" class="legend"></ul>
       <h3>Кабели операторов</h3>
@@ -104,6 +110,10 @@
     <button type="button" class="tool-btn admin-tool" data-tool="route" hidden title="Участки трассы между колодцами">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19 10 9l5 6 4-10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="5" r="2.5"/></svg>
       <span>Трасса</span>
+    </button>
+    <button type="button" class="tool-btn admin-tool" data-tool="jumper" hidden title="Перемычка: линия с подписью между двумя объектами">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="18" r="3"/><circle cx="19" cy="6" r="3"/><path d="M7 16 17 8" stroke="currentColor" stroke-width="2.4" stroke-dasharray="3 2.5"/></svg>
+      <span>Перемычка</span>
     </button>
     <button type="button" class="tool-btn admin-tool" data-tool="cable" hidden title="Проложить кабель по существующим трассам">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17c4 0 4-10 9-10s5 10 9 10" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
@@ -146,5 +156,6 @@
 
   <script src="vendor/leaflet/leaflet.js"></script>
   <script type="module" src="js/app.js"></script>
+  <script type="module" src="/js/pwa.js"></script>
 </body>
 </html>

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.api.routes.edit import _run
 from app.core.auth import current_user, require_role
 from app.core.db import get_db
-from app.models import AppUser, Role
+from app.models import AppUser, CrsDef, Role
 from app.services import export, impact, monitoring
 from app.services.editing import EditError, audit
 
@@ -82,15 +82,25 @@ def access_path(an_id: int, db: Session = Depends(get_db)) -> dict:
 # ------------------------------------------------------------------ экспорт сети
 
 
-@router.get("/export/network.{fmt}", summary="Экспорт сети в KML (Google Earth) или GeoJSON")
-def export_network(fmt: str, operator_id: int | None = None, db: Session = Depends(get_db),
-                   user: AppUser = Depends(admin_only)):
-    if fmt not in ("kml", "geojson"):
-        raise HTTPException(404, "Формат: kml или geojson")
-    data = export.to_kml(db, operator_id) if fmt == "kml" else export.to_geojson(db, operator_id)
-    audit(db, user.id, "export", "network", operator_id, None, {"format": fmt, "bytes": len(data)})
+@router.get("/export/network.{fmt}", summary="Экспорт сети: KML (Google Earth), GeoJSON или Shapefile (zip)")
+def export_network(fmt: str, operator_id: int | None = None, crs_id: int | None = None,
+                   db: Session = Depends(get_db), user: AppUser = Depends(admin_only)):
+    if fmt not in ("kml", "geojson", "zip"):
+        raise HTTPException(404, "Формат: kml, geojson или zip (Shapefile)")
+    if fmt == "zip":
+        crs_def = db.get(CrsDef, crs_id) if crs_id else None
+        if crs_id and crs_def is None:
+            raise HTTPException(404, "Система координат не найдена")
+        try:
+            data = export.to_shapefile(db, operator_id, crs_def)
+        except EditError as exc:
+            raise HTTPException(409, str(exc)) from None
+    else:
+        data = export.to_kml(db, operator_id) if fmt == "kml" else export.to_geojson(db, operator_id)
+    audit(db, user.id, "export", "network", operator_id, None, {"format": fmt, "bytes": len(data), "crs_id": crs_id})
     db.commit()
-    mime = "application/vnd.google-earth.kml+xml" if fmt == "kml" else "application/geo+json"
+    mime = {"kml": "application/vnd.google-earth.kml+xml", "geojson": "application/geo+json",
+            "zip": "application/zip"}[fmt]
     suffix = f"_оператор{operator_id}" if operator_id else ""
-    name = quote(f"сеть_ВОЛС{suffix}.{fmt}")
+    name = quote(f"сеть_ВОЛС{suffix}{'_shp' if fmt == 'zip' else ''}.{fmt}")
     return Response(data, media_type=mime, headers={"Content-Disposition": f"attachment; filename*=UTF-8''{name}"})

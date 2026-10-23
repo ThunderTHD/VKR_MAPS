@@ -6,6 +6,7 @@ import { Editor } from "./edit.js";
 import { LAYER_INFO, MapLayers } from "./layers.js";
 import { FieldTools, setupClosurePhoto } from "./field.js";
 import { ImpactTool } from "./impact.js";
+import { setupOverlays } from "./overlay-layer.js";
 import { LocateTool } from "./locate.js";
 
 const $ = (id) => document.getElementById(id);
@@ -150,9 +151,7 @@ function buildToggles() {
 
 function updateFilterChip() {
   // Экспорт сети учитывает фильтр по оператору
-  for (const fmt of ["kml", "geojson"]) {
-    $(`menu-export-${fmt}`).href = `/api/export/network.${fmt}` + (state.operator_id ? `?operator_id=${state.operator_id}` : "");
-  }
+  $("menu-export").href = "/export.html" + (state.operator_id ? `?operator_id=${state.operator_id}` : "");
   const parts = [];
   if (state.operator_id) parts.push($("filter-operator").selectedOptions[0].text);
   if (state.owner_id) parts.push(`трассы: ${$("filter-owner").selectedOptions[0].text}`);
@@ -197,12 +196,13 @@ function setupSearch() {
         li.tabIndex = 0;
         li.innerHTML = `<span class="badge badge-${r.type}"></span><span class="label"></span>`;
         li.firstChild.textContent = { node: "Узел", closure: "Муфта", cable: "Кабель",
-          access_node: "Узел доступа" }[r.type];
+          access_node: "Узел доступа", point: "Координаты" }[r.type];
         li.lastChild.textContent = r.label;
         const choose = () => {
           list.hidden = true;
           input.blur();
-          openObject(r.type, r.id);
+          if (r.type === "point") showPoint(r.lat, r.lon, r.label);
+          else openObject(r.type, r.id);
         };
         li.addEventListener("click", choose);
         li.addEventListener("keydown", (e) => e.key === "Enter" && choose());
@@ -218,6 +218,16 @@ function setupSearch() {
   document.addEventListener("click", (e) => {
     if (!e.target.closest(".search")) list.hidden = true;
   });
+}
+
+// Найденная по координатам точка: маркер-метка на карте, по щелчку — убрать
+let pointMarker = null;
+function showPoint(lat, lon, label) {
+  pointMarker?.remove();
+  pointMarker = L.circleMarker([lat, lon], { radius: 10, color: "#dc2626", weight: 3, fillOpacity: 0.2 })
+    .bindTooltip(label, { permanent: true, direction: "top", offset: [0, -10] }).addTo(map);
+  pointMarker.on("click", () => { pointMarker.remove(); pointMarker = null; });
+  map.setView([lat, lon], Math.max(map.getZoom(), 18));
 }
 
 // ---------- Прочее ----------
@@ -247,8 +257,9 @@ function setupUi(user) {
     $("menu-import").hidden = false;
     $("menu-calibration").hidden = false;
     $("menu-experiments").hidden = false;
-    $("menu-export-kml").hidden = false;
-    $("menu-export-geojson").hidden = false;
+    $("menu-export").hidden = false;
+    $("menu-crs").hidden = false;
+    $("menu-overlays").hidden = false;
   }
   $("btn-user").addEventListener("click", () => togglePanel("user-menu", $("btn-user")));
   $("btn-logout").addEventListener("click", async () => {
@@ -310,6 +321,7 @@ async function main() {
     reopen: (type, id) => openObject(type, id, { fly: false }) });
   editor.ctx.field = new FieldTools({ map, toast, closeCard, openObject: (type, id) => openObject(type, id) });
   setupClosurePhoto({ user, toast, reload: loadLayers, openObject: (type, id) => openObject(type, id) });
+  setupOverlays(map, $("overlay-list"), { canEdit: user.role === "admin", toast });
   window.vols = { map, layers, draw }; // для отладки из консоли браузера и проверок интерфейса
   fillSelect($("filter-operator"), ref.operators);
   fillSelect($("filter-owner"), ref.owners);

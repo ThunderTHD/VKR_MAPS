@@ -115,6 +115,27 @@ export class Editor {
         btn("Удалить", () => this.deleteCross(card), "btn-danger");
       }
     }
+    if (card.type === "jumper" && (this.isAdmin || this.isInstaller)) {
+      btn("Изменить подпись", async () => {
+        const label = prompt("Подпись перемычки:", card.edit?.label || "");
+        if (label === null) return;
+        try {
+          await api(`/api/jumpers/${card.id}`, { method: "PATCH", body: { label } });
+          await this.ctx.reload();
+          this.ctx.reopen("jumper", card.id);
+        } catch (e) {
+          this.ctx.toast(e.message);
+        }
+      });
+      if (this.isAdmin) {
+        btn("Удалить", async () => {
+          if (!confirm("Удалить перемычку?")) return;
+          await api(`/api/jumpers/${card.id}`, { method: "DELETE" });
+          this.ctx.closeCard();
+          await this.ctx.reload();
+        }, "btn-danger");
+      }
+    }
     if (card.type === "unclassified" && this.isAdmin) {
       btn("Назначить тип", () => this.classifyForm(card));
     }

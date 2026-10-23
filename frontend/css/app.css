@@ -748,3 +748,30 @@ button.near-item:hover { background: var(--surface-2); }
 .viz-key { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .viz-key i { flex: none; width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
 .viz, .viz > * { min-width: 0; }
+
+/* ---------- Этап 13: подложки ---------- */
+.overlay-img { position: absolute; left: 0; top: 0; max-width: none; pointer-events: none; image-rendering: auto; }
+.overlay-row { display: grid; grid-template-columns: minmax(0, 1fr) 110px; align-items: center; gap: 8px; }
+.overlay-row input[type=range] { width: 100%; }
+.geo-wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.geo-pane { position: relative; height: 62vh; min-height: 360px; border-radius: 10px; overflow: hidden;
+  background: var(--surface-2); border: 1px solid var(--line); }
+.geo-pane .leaflet-container { height: 100%; }
+.geo-img-map { background: #e9ecef; }
+.cp-list { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 4px; font-size: 13px; }
+.cp-list li { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cp-tag { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #dc2626;
+  color: #fff; font-weight: 700; font-size: 12px; }
+.cp-marker { display: grid; place-items: center; width: 22px !important; height: 22px !important; border-radius: 50%;
+  background: #dc2626; color: #fff; font: 700 12px/1 system-ui; border: 2px solid #fff; box-shadow: 0 1px 3px #0006; }
+@media (max-width: 760px) { .geo-wrap { grid-template-columns: 1fr; } .geo-pane { height: 46vh; } }
+
+/* ---------- PWA: работа без связи ---------- */
+.offline-badge {
+  position: fixed; left: 50%; transform: translateX(-50%); z-index: 2000;
+  bottom: calc(max(8px, env(safe-area-inset-bottom)) + 84px);
+  max-width: calc(100% - 32px); padding: 8px 14px; border-radius: 10px;
+  background: #7c2d12; color: #fff; font-size: 13px; text-align: center;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.25);
+}
+.offline-badge[hidden] { display: none; }

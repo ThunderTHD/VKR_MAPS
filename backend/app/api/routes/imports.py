@@ -1,5 +1,5 @@
 """Импорт KML: загрузка, предпросмотр, изменение сопоставления папок, подтверждение."""
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -39,12 +39,12 @@ def _job_info(job: ImportJob) -> dict:
             "summary": (job.report or job.preview or {}).get("summary")}
 
 
-@router.post("/kml", summary="Загрузить KML/KMZ и получить предпросмотр")
-async def upload_kml(file: UploadFile = File(...), db: Session = Depends(get_db),
+@router.post("/kml", summary="Загрузить KML/KMZ или Shapefile (zip) и получить предпросмотр")
+async def upload_kml(file: UploadFile = File(...), crs_id: int | None = Form(None), db: Session = Depends(get_db),
                      user: AppUser = Depends(admin_only)) -> dict:
     data = await file.read()
     try:
-        job = jobs.create_job(db, file.filename or "import.kml", data, user.id)
+        job = jobs.create_job(db, file.filename or "import.kml", data, user.id, crs_id=crs_id)
         preview = jobs.build_preview(db, job)
     except KmlError as exc:
         db.rollback()
