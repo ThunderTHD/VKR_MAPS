@@ -1,4 +1,4 @@
-// Пакеты ИД: загрузка PDF → разбор в фоне → замечания → сопоставление с сетью → подтверждение.
+// Пакеты ИД: загрузка PDF или Word → разбор в фоне → замечания → сопоставление с сетью → подтверждение.
 import { api } from "./api.js";
 
 const $ = (id) => document.getElementById(id);
@@ -137,6 +137,7 @@ async function open(id) {
     body.replaceChildren(el("p", { class: "form-error" }, p.error || "Не удалось разобрать файл"));
     return;
   }
+  isWord = p.summary?.format === "docx";
   link.cable = p.suggest?.cable_id ?? p.cable_id ?? null;
   link.portA = p.suggest?.port_a ?? null;
   link.portB = p.suggest?.port_b ?? null;
@@ -146,9 +147,12 @@ async function open(id) {
   showPoles(p.extracted?.poles?.poles);
 }
 
+let isWord = false;   // пакет в Word: у файла нет страниц, ссылки «на страницу» не нужны
+
 function pdfLink(docId, page, text) {
-  return el("a", { href: `/api/documents/${docId}/file${page ? `#page=${page}` : ""}`, target: "_blank", rel: "noopener" },
-    text);
+  if (isWord && page) return text;
+  return el("a", { href: `/api/documents/${docId}/file${page && !isWord ? `#page=${page}` : ""}`, target: "_blank",
+    rel: "noopener" }, text);
 }
 
 function summaryBlock(p) {
@@ -162,7 +166,7 @@ function summaryBlock(p) {
       el("dt", {}, "Подрядчик"), el("dd", {}, s.contractor || "—"),
       el("dt", {}, "Дата паспорта"), el("dd", {}, s.doc_date ? new Date(s.doc_date).toLocaleDateString("ru-RU") : "—"),
       el("dt", {}, "Статус"), el("dd", {}, STATUS_RU[p.status]),
-      el("dt", {}, "Файл"), el("dd", {}, p.document_id ? pdfLink(p.document_id, null, "открыть PDF") : "—")),
+      el("dt", {}, "Файл"), el("dd", {}, p.document_id ? pdfLink(p.document_id, null, isWord ? "скачать Word" : "открыть PDF") : "—")),
     el("div", { class: "summary" },
       tile(s.pages, "страниц"), tile(s.ocr_pages ?? 0, `распознано сканов из ${s.scans ?? 0}`),
       tile(s.errors, "ошибок", s.errors ? "warn" : "ok"), tile(s.warnings, "предупреждений", s.warnings ? "warn" : "ok")));
@@ -260,7 +264,57 @@ function matchBlock(p) {
       cableSel.replaceChildren(new Option("— кабель не выбран —", ""), ...rows.map((r) => new Option(r.label, r.id)));
     }, 250);
   });
-  cableSel.addEventListener("change", () => { link.cable = Number(cableSel.value) || null; });
+  const spliceBox = el("div");
+  const spliceChoices = [];
+  async function loadSplices() {
+    spliceChoices.length = 0;
+    let plan;
+    try {
+      plan = await api(`/api/asbuilt/${p.id}/splice-plan`, { params: { cable_id: link.cable } });
+    } catch (e) {
+      spliceBox.replaceChildren(el("p", { class: "form-error" }, e.message));
+      return;
+    }
+    if (!plan.length) {
+      spliceBox.replaceChildren();
+      return;
+    }
+    spliceBox.replaceChildren(el("h3", {}, "Рассветка из протоколов монтажа"),
+      el("p", { class: "muted small" }, "Сварки будут записаны в выбранную муфту. Муфты предлагаются на концах выбранного " +
+        "кабеля, кабели — по маркам из протокола. Уже существующие сварки не дублируются."),
+      ...plan.map((g) => spliceGroup(g)));
+  }
+  function spliceGroup(g) {
+    const choice = { group: g.group, closure_id: g.closure_id, cable_a_id: g.cable_a_id, cable_b_id: g.cable_b_id };
+    spliceChoices.push(choice);
+    const cabOpts = (cid, sel) => {
+      const clo = g.closures.find((c) => c.id === cid);
+      return [new Option("— кабель —", ""), ...(clo?.cables || []).map((c) => new Option(`${c.name} (${c.mark})`, c.id, false, c.id === sel))];
+    };
+    const selA = el("select", {}, ...cabOpts(g.closure_id, g.cable_a_id));
+    const selB = el("select", {}, ...cabOpts(g.closure_id, g.cable_b_id));
+    const selC = el("select", {}, new Option(g.closures.length ? "— не записывать —" : "нет муфт на концах кабеля", ""),
+      ...g.closures.map((c) => new Option(c.label, c.id, false, c.id === g.closure_id)));
+    selC.addEventListener("change", () => {
+      choice.closure_id = Number(selC.value) || null;
+      selA.replaceChildren(...cabOpts(choice.closure_id, null));
+      selB.replaceChildren(...cabOpts(choice.closure_id, null));
+      choice.cable_a_id = choice.cable_b_id = null;
+    });
+    selA.addEventListener("change", () => { choice.cable_a_id = Number(selA.value) || null; });
+    selB.addEventListener("change", () => { choice.cable_b_id = Number(selB.value) || null; });
+    const title = g.kind === "closure_protocol" ? "Протокол монтажа муфты" : "Протокол монтажа кросса (сварки в узле)";
+    return el("div", { class: "page-card splice-group" },
+      el("b", {}, `${title}, стр. ${g.page}`), g.place ? el("div", { class: "muted small" }, g.place) : null,
+      el("ul", { class: "small" }, g.rows.map((r) => el("li", {},
+        `${g.cable_a} ОВ ${r.fiber_a}${r.color_a ? ` (${r.color_a})` : ""} → ${g.cable_b} ОВ ${r.fiber_b}` +
+        `${r.color_b ? ` (${r.color_b})` : ""}${r.loss_db != null ? `, ${String(r.loss_db).replace(".", ",")} дБ` : ""}`))),
+      el("div", { class: "edit-form compact" }, el("label", { class: "field" }, "Муфта в системе", selC),
+        el("label", { class: "field" }, `Кабель A (${g.cable_a})`, selA),
+        el("label", { class: "field" }, `Кабель Б (${g.cable_b})`, selB)));
+  }
+  cableSel.addEventListener("change", () => { link.cable = Number(cableSel.value) || null; loadSplices(); });
+  loadSplices();
   const sysBox = el("div");
   const opts = [["measurement", "Измерение тракта — эталон для калибровки", !!s.measurement],
     ["twist", `Укрутка кабеля из ИД${s.twist != null ? ` (${(s.twist * 100).toFixed(2)} %)` : ""}`, s.twist != null],
@@ -268,7 +322,8 @@ function matchBlock(p) {
     ["access_node", `Узел доступа ${s.access_node?.hostname || ""}${s.access_node?.exists_id ? " (обновить)" : " (создать)"}`,
       !!s.access_node?.hostname],
     ["poles", `Опоры с координатами на карту (${s.poles})`, false],
-    ["attach", "Прикрепить PDF к кабелю", true]];
+    ["splices", "Сварки из протоколов в муфты (рассветка)", true],
+    ["attach", `Прикрепить ${isWord ? "файл Word" : "PDF"} к кабелю`, true]];
   const checks = Object.fromEntries(opts.map(([k, , on]) => [k, el("input", { type: "checkbox", checked: on })]));
   const err = el("p", { class: "form-error", hidden: true });
   const body = () => ({ cable_id: link.cable, port_a_id: link.portA?.id ?? null, port_b_id: link.portB?.id ?? null });
@@ -287,6 +342,7 @@ function matchBlock(p) {
       }
     } }, "Сверить с системой")),
     sysBox,
+    spliceBox,
     el("h3", {}, "Что записать"),
     el("div", { class: "toggles" }, opts.map(([k, label]) => el("label", { class: "toggle small" }, checks[k], el("span", {}, label)))),
     err,
@@ -295,6 +351,7 @@ function matchBlock(p) {
         err.hidden = true;
         try {
           const opt = Object.fromEntries(Object.entries(checks).map(([k, c]) => [k, c.checked]));
+          opt.splices = opt.splices ? spliceChoices.filter((c) => c.closure_id) : null;
           const r = await api(`/api/asbuilt/${p.id}/confirm`, { method: "POST", body: { ...body(), ...opt } });
           toast(`Записано: ${Object.keys(r).join(", ") || "ничего"}`);
           open(p.id);
@@ -315,7 +372,8 @@ function resultBlock(p) {
   const rep = p.check_report || {};
   const applied = rep.applied || {};
   const names = { measurement_id: "измерение тракта", twist: "укрутка кабеля", instruments: "приборы",
-    access_node_id: "узел доступа", poles: "опоры", document_id: "PDF прикреплён к кабелю" };
+    access_node_id: "узел доступа", poles: "опоры", document_id: "файл прикреплён к кабелю",
+    splices: "сварки в муфты" };
   return el("div", {},
     p.status === "confirmed" ? el("div", {}, el("h2", {}, "Записано в систему"),
       el("ul", { class: "small" }, Object.keys(applied).map((k) => el("li", {}, names[k] || k,

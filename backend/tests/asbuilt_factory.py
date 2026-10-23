@@ -33,45 +33,29 @@ def font_path() -> str | None:
     return None
 
 
-def sample_pdf(scan: bool = True) -> bytes:
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import ParagraphStyle
-    from reportlab.pdfbase import pdfmetrics
-    from reportlab.pdfbase.ttfonts import TTFont
-    from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+def _content() -> list[list[tuple]]:
+    """Страницы синтетического пакета: ("p", текст, стиль) | ("t", строки таблицы). Общие для PDF и Word."""
 
-    fp = font_path()
-    if fp is None:
-        raise RuntimeError("Нет шрифта DejaVuSans для кириллицы")
-    pdfmetrics.registerFont(TTFont("DejaVu", fp))
-    st = ParagraphStyle("t", fontName="DejaVu", fontSize=9, leading=11)
-    big = ParagraphStyle("b", fontName="DejaVu", fontSize=12, leading=15)
+    def p(text, style="normal"):
+        return ("p", text, style)
 
-    def p(text, style=st):
-        return Paragraph(text.replace("\n", "<br/>"), style)
-
-    def lines(*rows, style=st):
+    def lines(*rows, style="normal"):
         return [p(r, style) for r in rows]
 
     def table(data, widths=None):
-        t = Table(data, colWidths=widths)
-        t.setStyle(TableStyle([("FONT", (0, 0), (-1, -1), "DejaVu", 8),
-                               ("GRID", (0, 0), (-1, -1), 0.5, "black"),
-                               ("VALIGN", (0, 0), (-1, -1), "TOP")]))
-        return t
+        return ("t", data)
 
-    story = []
+    pages = []
 
     def page(*items):
-        story.extend(items)
-        story.append(PageBreak())
+        pages.append([x for x in items if x is not None])
 
     page(*lines("Исполнительная Документация", f"Строительство ВОЛС до здания по адресу {ADDRESS}",
-                "Подрядная организация: ООО «Тест-Связь»", style=big))
+                "Подрядная организация: ООО «Тест-Связь»", style="big"))
     page(*lines("АКТ приёмки", "пуско-наладочных работ по объекту", "г. Учебный 15 августа 2026 г.",
                 f"Информация о размещении оборудования на адрес/ {ADDRESS} площадки :",
                 "Марка оборудования: TEST-SW-24", "Серийный номер: SN000123 Финансовые параметры"),
-         Spacer(1, 8),
+         None,
          table([["Коммутация", "HostName/ IP/ порт КД", "Кросс", "Кассета", "Порт"],
                 ["Устанавливаемое оборудование", "99TSTX-ACCF00-001\n(10.10.10.10) ge0/0/25", "ODF-1", "", "1"],
                 ["Вышестоящее оборудование", "99TSTX-AGGF00-DSW1\n(10.10.10.1) GigabitEthernet0/0/1", "ODF-4",
@@ -150,6 +134,34 @@ def sample_pdf(scan: bool = True) -> bytes:
          table([["№ п/п", "Объект", "Обозначение", "Координаты", "Примечание"]] +
                [[str(i + 1), "Опора железобетонная", f"Сущ.опора №{i + 1}", f"{lat:.6f}, {lon:.6f}", ""]
                 for i, (lat, lon) in enumerate(POLES)]), *lines(*SIGN))
+    return pages
+
+
+def sample_pdf(scan: bool = True) -> bytes:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Table, TableStyle
+
+    fp = font_path()
+    if fp is None:
+        raise RuntimeError("Нет шрифта DejaVuSans для кириллицы")
+    pdfmetrics.registerFont(TTFont("DejaVu", fp))
+    styles = {"normal": ParagraphStyle("t", fontName="DejaVu", fontSize=9, leading=11),
+              "big": ParagraphStyle("b", fontName="DejaVu", fontSize=12, leading=15)}
+    story = []
+    for items in _content():
+        for it in items:
+            if it[0] == "p":
+                story.append(Paragraph(it[1].replace("\n", "<br/>"), styles[it[2]]))
+            else:
+                t = Table(it[1])
+                t.setStyle(TableStyle([("FONT", (0, 0), (-1, -1), "DejaVu", 8),
+                                       ("GRID", (0, 0), (-1, -1), 0.5, "black"),
+                                       ("VALIGN", (0, 0), (-1, -1), "TOP")]))
+                story.append(t)
+        story.append(PageBreak())
     if scan:
         story.append(Image(io.BytesIO(_calibration_scan(fp)), width=A4[0] - 80, height=(A4[0] - 80) * 1.25))
     else:
@@ -157,6 +169,53 @@ def sample_pdf(scan: bool = True) -> bytes:
     buf = io.BytesIO()
     SimpleDocTemplate(buf, pagesize=A4, leftMargin=40, rightMargin=40, topMargin=40, bottomMargin=40,
                       title="ИД (синтетический пример)").build(story)
+    return buf.getvalue()
+
+
+def sample_docx(scan: bool = True) -> bytes:
+    """Тот же пакет в формате Word: каждый документ — отдельный раздел «с новой страницы».
+
+    Объединённые ячейки заголовков таблиц (в PDF — пустые клетки) объединяются и в Word —
+    так проверяется, что разбор устойчив к повтору текста в объединённых ячейках.
+    """
+    from docx import Document
+    from docx.enum.section import WD_SECTION
+    from docx.shared import Cm
+
+    doc = Document()
+    first = True
+    for items in _content():
+        if not first:
+            doc.add_section(WD_SECTION.NEW_PAGE)
+        first = False
+        for it in items:
+            if it[0] == "p":
+                for line in it[1].split("\n"):
+                    doc.add_paragraph(line)
+            else:
+                rows = it[1]
+                ncol = max(len(r) for r in rows)
+                t = doc.add_table(rows=len(rows), cols=ncol)
+                for i, r in enumerate(rows):
+                    for j in range(ncol):
+                        v = r[j] if j < len(r) else None
+                        if v is not None:
+                            t.cell(i, j).text = str(v)
+                # Пустая клетка справа от заполненной в строке заголовка — объединённая ячейка
+                for i, r in enumerate(rows[:2]):
+                    j = 0
+                    while j < ncol:
+                        k = j + 1
+                        while k < ncol and (k >= len(r) or r[k] is None) and r[j] is not None:
+                            k += 1
+                        if k - j > 1 and i == 0:
+                            t.cell(i, j).merge(t.cell(i, k - 1))
+                        j = k
+    if scan:
+        doc.add_section(WD_SECTION.NEW_PAGE)
+        doc.add_picture(io.BytesIO(_calibration_scan(font_path())), width=Cm(16))
+    buf = io.BytesIO()
+    doc.save(buf)
     return buf.getvalue()
 
 

@@ -32,7 +32,29 @@ PATTERNS = [
                rf"(?:lon(?:g(?:itude)?)?|lng|долг(?:ота)?)\s*[:=]?\s*{NUM}\s*°?\s*{HEMI_LON}?", re.I | re.S),
     # 55.701234° N, 52.345678° E  /  55.701234, 52.345678
     re.compile(rf"{NUM}\s*°?\s*{HEMI_LAT}?\s*[,;/ ]\s*{NUM}\s*°?\s*{HEMI_LON}?", re.I),
+    # Подписи на разных строках с искажёнными OCR словами («Wwupota: 55.674239 / Donrota: 52.330327»):
+    # два числа с 5+ знаками после точки рядом друг с другом
+    re.compile(r"(-?\d{1,2}[.,]\d{5,})\s*°?\s*([NSСЮ])?[^\d\n]{0,30}\n?[^\d\n]{0,30}?"
+               r"(-?\d{1,3}[.,]\d{5,})\s*°?\s*([EWВЗ])?", re.I),
 ]
+# «TouHoctb» — так английский OCR читает русское «Точность»
+ACCURACY = re.compile(r"(?:Точност\w*|Accuracy|Погрешност\w*|T[oо][uч][hн][oо][cс]t\w*)"
+                      r"\s*[:=]?\s*±?\s*(\d+(?:[.,]\d+)?)\s*(?:м|m)\b", re.I)
+STAMP_TIME = re.compile(r"(\d{2})[-./](\d{2})[-./](\d{4})(?:[ ,T]+(\d{1,2})[:.](\d{2}))?")
+
+
+def parse_extra(text: str) -> dict:
+    """Точность GPS и время съёмки с подписи «GPS-камеры» (NoteCam: «Точность: 10.97 м», «Время: 31-08-2026 16:31»)."""
+    out = {}
+    m = ACCURACY.search(text)
+    if m:
+        out["accuracy_m"] = _f(m[1])
+    m = STAMP_TIME.search(text)
+    if m:
+        with contextlib.suppress(ValueError):
+            out["taken_at"] = datetime(int(m[3]), int(m[2]), int(m[1]), int(m[4] or 0), int(m[5] or 0),
+                                       tzinfo=ZoneInfo(get_settings().display_tz))
+    return out
 DMS = re.compile(r"(\d{1,3})\s*°\s*(\d{1,2})\s*['′’]\s*(\d{1,2}(?:[.,]\d+)?)\s*(?:\"|″|”|'')?\s*([NSEWСЮВЗМЕ])",
                  re.I)
 # OCR с русским словарём путает латинские буквы сторон света с похожими кириллическими
@@ -125,7 +147,8 @@ def from_ocr(img: Image.Image) -> dict | None:
                     return None
                 found = parse_text(text)
                 if found:
-                    return {"lat": found[0], "lon": found[1], "source": "ocr", "text": " ".join(text.split())[:200]}
+                    return {"lat": found[0], "lon": found[1], "source": "ocr", **parse_extra(text),
+                            "text": " ".join(text.split())[:200]}
     return None
 
 
@@ -143,5 +166,5 @@ def extract(data: bytes, filename: str, *, ocr: bool = True) -> dict | None:
     if "lat" not in meta and ocr:
         found = from_ocr(img)
         if found:
-            meta.update(found)
+            meta.update({k: v for k, v in found.items() if k != "taken_at" or "taken_at" not in meta})
     return meta or None

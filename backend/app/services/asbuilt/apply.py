@@ -20,9 +20,11 @@ from app.models import (
     AccessNode,
     AsBuiltPackage,
     Cable,
+    Closure,
     CrossPort,
     Document,
     DocumentKind,
+    Fiber,
     Instrument,
     InstrumentKind,
     Measurement,
@@ -30,9 +32,11 @@ from app.models import (
     OpticalCross,
     PackageStatus,
     SourceKind,
+    Splice,
 )
-from app.services import drawing, tracing
+from app.services import drawing, splicing, tracing
 from app.services.asbuilt import parser
+from app.services.asbuilt.docx_pages import is_docx
 from app.services.editing import EditError, audit
 from app.services.kml.jobs import store_upload
 
@@ -43,13 +47,20 @@ STALE_MINUTES = 30
 # ------------------------------------------------------------------ загрузка и фоновый разбор
 
 
+DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+
 def create_package(db: Session, filename: str, data: bytes, user_id: int | None) -> AsBuiltPackage:
     if len(data) > MAX_BYTES:
         raise EditError("Файл больше 100 МБ")
-    if not data.startswith(b"%PDF-"):
-        raise EditError("Это не PDF: пакет ИД загружается одним PDF-файлом")
+    if data.startswith(b"%PDF-"):
+        mime = "application/pdf"
+    elif is_docx(data):
+        mime = DOCX_MIME
+    else:
+        raise EditError("Это не PDF и не Word (.docx): пакет ИД загружается одним файлом PDF или DOCX")
     doc = store_upload(db, filename, data, DocumentKind.asbuilt, user_id)
-    doc.mime = "application/pdf"
+    doc.mime = mime
     pkg = AsBuiltPackage(status=PackageStatus.processing, filename=filename, document_id=doc.id,
                          uploaded_by=user_id, parse_result={"progress": {"done": 0, "total": 0, "stage": "очередь"}})
     db.add(pkg)
@@ -70,10 +81,11 @@ def process(session_factory, pkg_id: int, ocr: bool = True) -> None:
             pkg.parse_result = {"progress": {"done": done, "total": total, "stage": stage}}
             db.commit()
 
+        word = pkg.document.mime == DOCX_MIME
         try:
-            result = parser.parse_pdf(path, ocr=ocr, progress=progress)
+            result = (parser.parse_docx if word else parser.parse_pdf)(path, ocr=ocr, progress=progress)
         except Exception as exc:  # noqa: BLE001 — любая ошибка разбора должна дойти до пользователя
-            pkg.status, pkg.error = PackageStatus.failed, f"Не удалось разобрать PDF: {exc}"
+            pkg.status, pkg.error = PackageStatus.failed, f"Не удалось разобрать {'Word' if word else 'PDF'}: {exc}"
             pkg.parse_result = None
             db.commit()
             return
@@ -256,7 +268,7 @@ def compare(db: Session, pkg: AsBuiltPackage, cable_id: int | None, port_a_id: i
 def confirm(db: Session, pkg: AsBuiltPackage, *, cable_id: int | None, port_a_id: int | None,
             port_b_id: int | None, measurement: bool = True, twist: bool = True, instruments: bool = True,
             access_node: bool = True, poles: bool = False, attach: bool = True,
-            user_id: int | None = None) -> dict:
+            splices: list[dict] | None = None, user_id: int | None = None) -> dict:
     if pkg.status != PackageStatus.parsed:
         raise EditError("Подтвердить можно только разобранный и ещё не подтверждённый пакет")
     res = pkg.parse_result or {}
@@ -306,6 +318,9 @@ def confirm(db: Session, pkg: AsBuiltPackage, *, cable_id: int | None, port_a_id
     if poles and ex.get("poles", {}).get("poles"):
         done["poles"] = _add_poles(db, ex["poles"]["poles"], user_id)
 
+    if splices:
+        done["splices"] = _write_splices(db, pkg, splices, user_id)
+
     if attach and pkg.document_id and cable is not None:
         doc = db.get(Document, pkg.document_id)
         doc.owner_type, doc.owner_id = "cable", cable.id
@@ -319,6 +334,106 @@ def confirm(db: Session, pkg: AsBuiltPackage, *, cable_id: int | None, port_a_id
     db.flush()
     audit(db, user_id, "confirm", "asbuilt_package", pkg.id, None, {k: v for k, v in done.items()})
     return done
+
+
+# ------------------------------------------------------------------ рассветка из протоколов
+
+
+def splice_groups(res: dict) -> list[dict]:
+    """Сварки из протоколов монтажа муфт и кроссов (все страницы, а не только первая каждого типа)."""
+    out = []
+    for p in res.get("pages", []):
+        rows = (p.get("data") or {}).get("splices") or []
+        if p["kind"] in ("closure_protocol", "cross_protocol") and rows:
+            out.append({"group": len(out), "page": p["page"], "kind": p["kind"], "place": p["data"].get("place"),
+                        "cable_a": rows[0].get("cable_a"), "cable_b": rows[0].get("cable_b"),
+                        "rows": [{"fiber_a": r["fiber_a"], "color_a": r.get("color_a"), "fiber_b": r["fiber_b"],
+                                  "color_b": r.get("color_b"), "loss_db": _loss(r)} for r in rows]})
+    return out
+
+
+def _loss(r: dict) -> float | None:
+    for k in ("loss_splicer", "loss_otdr_avg"):
+        if r.get(k) is not None:
+            return r[k]
+    return None
+
+
+def _mark_key(mark: str | None) -> str:
+    """«ОКЛ-8 (G.652.D)-T» → «ОКЛ-8»: тип и ёмкость — для сопоставления марок из ИД и справочника."""
+    m = re.match(r"\s*([А-ЯA-Z]{2,4}(?:-[А-ЯA-Z])?-\d{1,3})", (mark or "").upper().replace(" ", ""))
+    return m[1] if m else (mark or "").upper().replace(" ", "")[:8]
+
+
+def splice_plan(db: Session, pkg: AsBuiltPackage, cable_id: int | None) -> list[dict]:
+    """Куда записать сварки: муфты на концах выбранного кабеля и кабели в них по маркам."""
+    groups = splice_groups(pkg.parse_result or {})
+    if not groups:
+        return []
+    cable = db.get(Cable, cable_id) if cable_id else None
+    closures = []
+    if cable is not None:
+        closures = db.scalars(sa.select(Closure).where(
+            Closure.node_id.in_([n for n in (cable.start_node_id, cable.end_node_id) if n]))
+            .order_by(Closure.number)).all()
+    options = []
+    for clo in closures:
+        ends = splicing.cable_ends_at(db, clo.node_id)
+        options.append({"id": clo.id, "label": f"{clo.number} — {clo.node.code or clo.node.name or clo.node_id}",
+                        "cables": [{"id": e.cable.id, "name": e.cable.name, "mark": e.cable.cable_type.mark,
+                                    "key": _mark_key(e.cable.cable_type.mark)} for e in ends]})
+    for g in groups:
+        g["closures"] = options
+        g["closure_id"] = g["cable_a_id"] = g["cable_b_id"] = None
+        ka, kb = _mark_key(g["cable_a"]), _mark_key(g["cable_b"])
+        for opt in options:
+            a = [c for c in opt["cables"] if c["key"] == ka]
+            b = [c for c in opt["cables"] if c["key"] == kb]
+            # Новый кабель из пакета — одна из сторон; вторая — другой кабель той же марки, что в протоколе
+            if cable is not None and any(c["id"] == cable.id for c in b):
+                other = [c for c in a if c["id"] != cable.id]
+                if other:
+                    g.update(closure_id=opt["id"], cable_a_id=other[0]["id"], cable_b_id=cable.id)
+                    break
+            if cable is not None and any(c["id"] == cable.id for c in a):
+                other = [c for c in b if c["id"] != cable.id]
+                if other:
+                    g.update(closure_id=opt["id"], cable_a_id=cable.id, cable_b_id=other[0]["id"])
+                    break
+    return groups
+
+
+def _fiber(db: Session, cable_id, number: int) -> Fiber | None:
+    return db.scalar(sa.select(Fiber).where(Fiber.cable_id == int(cable_id), Fiber.number == number))
+
+
+def _write_splices(db: Session, pkg: AsBuiltPackage, choices: list[dict], user_id: int | None) -> dict:
+    groups = {g["group"]: g for g in splice_groups(pkg.parse_result or {})}
+    made = skipped = 0
+    for ch in choices:
+        g = groups.get(int(ch["group"]))
+        clo = db.get(Closure, int(ch["closure_id"])) if ch.get("closure_id") else None
+        if g is None or clo is None or not ch.get("cable_a_id") or not ch.get("cable_b_id"):
+            raise EditError("Для записи сварок выберите муфту и оба кабеля")
+        for r in g["rows"]:
+            fa = _fiber(db, ch["cable_a_id"], r["fiber_a"])
+            fb = _fiber(db, ch["cable_b_id"], r["fiber_b"])
+            if fa is None or fb is None:
+                missing = r["fiber_a"] if fa is None else r["fiber_b"]
+                raise EditError(f"Протокол стр. {g['page']}: в кабеле нет волокна №{missing}")
+            exists = db.scalar(sa.select(Splice.id).where(Splice.closure_id == clo.id, sa.or_(
+                sa.and_(Splice.fiber_a_id == fa.id, Splice.fiber_b_id == fb.id),
+                sa.and_(Splice.fiber_a_id == fb.id, Splice.fiber_b_id == fa.id))))
+            if exists:
+                skipped += 1
+                continue
+            try:
+                splicing.add_splice(db, clo, fa.id, fb.id, loss_db=r["loss_db"],
+                                    note=f"из пакета ИД №{pkg.id}", user_id=user_id)
+            except EditError as exc:
+                raise EditError(f"Протокол стр. {g['page']}, ОВ {r['fiber_a']}→{r['fiber_b']}: {exc}") from None
+            made += 1
+    return {"created": made, "already": skipped}
 
 
 def _upsert_instrument(db: Session, item: dict) -> Instrument:

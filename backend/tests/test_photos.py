@@ -137,3 +137,78 @@ def test_photo_points_validation(db):
     item = photo_points.analyze(db, [("x.png", _plain_png())], None)[0]
     with pytest.raises(EditError, match="нет координат"):
         photo_points.commit(db, [{"doc_id": item["doc_id"], "action": "create"}], None)
+
+
+# ------------------------------------------------------------------ муфта по фото
+
+
+def notecam_jpeg(lat: float, lon: float, accuracy: float = 10.97) -> bytes:
+    """Кадр с подписью как у NoteCam: светлый текст в левом нижнем углу."""
+    img = Image.new("RGB", (1180, 666), (170, 175, 180))
+    d = ImageDraw.Draw(img)
+    f = ImageFont.truetype(FONT, 22)
+    d.rectangle((0, 540, 250, 666), fill=(245, 245, 245))
+    for i, t in enumerate([f"Широта: {lat:.6f}", f"Долгота: {lon:.6f}", "Возвышение: 95.19±7.8 м",
+                           f"Точность: {accuracy} м", "Время: 31-08-2026 16:31"]):
+        d.text((4, 543 + i * 24), t, font=f, fill=(20, 20, 20))
+    b = io.BytesIO()
+    img.save(b, "JPEG", quality=92)
+    return b.getvalue()
+
+
+@pytest.fixture()
+def lines(db):
+    from tests.test_localization import _build
+    return _build(db)   # A —100 м— B —200 м— C, B — D; кабель X: A→C, Y: B→D
+
+
+def test_closure_at_nearby_well(db, lines):
+    from app.services import closure_photo
+    b = lines["n"]["B"]   # долгота 50.0016, широта 55.0
+    r = closure_photo.place(db, filename="m1.jpg", data=exif_jpeg(55.0 + 0.00004, 50.0016))
+    assert r["mode"] == "node" and r["node_id"] == b.id and r["distance_m"] < 6 and not r["needs_data"]
+    assert "в колодце" in r["message"]
+    docs = documents.list_documents(db, "closure", r["closure_id"])
+    assert len(docs) == 1 and docs[0]["coord_source"] == "exif" and docs[0]["distance_m"] < 6
+
+
+def test_closure_on_segment(db, lines):
+    from app.models import Closure
+    from app.services import closure_photo, splicing
+    # Середина участка A—B (≈50 м до колодцев), 8 м в сторону от линии
+    r = closure_photo.place(db, filename="m2.jpg", data=exif_jpeg(55.0 + 0.00007, 50.0008), number="М7")
+    assert r["mode"] == "segment" and 6 < r["distance_m"] < 10
+    node = db.get(NetworkNode, r["node_id"])
+    assert node.kind.value == "closure_point"
+    # Кабель X, проходивший по участку, теперь проходит через новую точку — в муфте его можно разварить
+    assert lines["x"].id in {c.id for c in splicing.transit_cables(db, node.id)}
+    assert db.get(Closure, r["closure_id"]).number == "М7"
+
+
+def test_closure_without_lines(db, lines):
+    from app.models import Closure
+    from app.services import closure_photo
+    r = closure_photo.place(db, filename="m3.jpg", data=exif_jpeg(55.01, 50.01))
+    assert r["mode"] == "free" and r["needs_data"]
+    clo = db.get(Closure, r["closure_id"])
+    assert "нет линий" in clo.note and "нет линий" in db.get(NetworkNode, r["node_id"]).note
+
+
+def test_closure_photo_without_coords(db, lines):
+    from app.services import closure_photo
+    with pytest.raises(EditError, match="не найдены координаты"):
+        closure_photo.place(db, filename="x.png", data=_plain_png())
+
+
+@pytest.mark.skipif(shutil.which("tesseract") is None, reason="нет Tesseract")
+def test_notecam_stamp_with_accuracy():
+    m = photo_coords.extract(notecam_jpeg(55.674239, 52.330327), "notecam.jpg")
+    assert m["source"] == "ocr" and m["lat"] == pytest.approx(55.674239) and m["lon"] == pytest.approx(52.330327)
+    assert m["accuracy_m"] == pytest.approx(10.97) and m["taken_at"].month == 8
+
+
+def test_parse_extra():
+    e = photo_coords.parse_extra("Точность: 10.97 м\nВремя: 31-08-2026 16:31")
+    assert e["accuracy_m"] == pytest.approx(10.97) and e["taken_at"].day == 31
+    assert photo_coords.parse_extra("TouHoctb: 5,5 M")["accuracy_m"] == pytest.approx(5.5)
+    assert photo_coords.parse_text("Wwupota: 55.674239\nDonrota: 52.330327") == pytest.approx((55.674239, 52.330327))

@@ -85,12 +85,17 @@
     <div id="card-body" class="panel-body"></div>
   </aside>
 
-  <!-- Инструменты рисования (только администратор) -->
+  <!-- Инструменты: повреждение и муфта по фото — всем, кто правит; рисование — администратор -->
   <nav id="draw-tools" class="draw-tools" aria-label="Инструменты">
     <button type="button" class="tool-btn" data-tool="locate" title="Найти место повреждения по рефлектометру">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 1 21h22L12 2Zm0 5.5L19.5 19h-15L12 7.5ZM11 10v5h2v-5h-2Zm0 6v2h2v-2h-2Z"/></svg>
       <span>Повреждение</span>
     </button>
+    <button type="button" id="btn-closure-photo" class="tool-btn" hidden title="Сфотографировать муфту — она встанет на карту по координатам с фото">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 7.2 6H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-3.2L15 4H9Zm3 5a4 4 0 1 1 0 8 4 4 0 0 1 0-8Z"/></svg>
+      <span>Муфта по фото</span>
+    </button>
+    <input id="closure-photo-file" type="file" accept="image/*" hidden>
     <button type="button" class="tool-btn admin-tool" data-tool="point" hidden title="Новая точка: колодец, опора, здание">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" stroke-width="2"/></svg>
       <span>Точка</span>

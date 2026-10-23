@@ -135,3 +135,32 @@ export class FieldTools {
     this.body.replaceChildren(tabs, acc, list);
   }
 }
+
+/** «Муфта по фото»: фото муфты → координаты с фото → муфта на ближайшей точке/трассе (монтажник, администратор). */
+export function setupClosurePhoto({ user, toast, reload, openObject }) {
+  const btn = document.getElementById("btn-closure-photo");
+  const input = document.getElementById("closure-photo-file");
+  if (user.role === "viewer") return;
+  btn.hidden = false;
+  btn.addEventListener("click", () => input.click());
+  input.addEventListener("change", async () => {
+    const f = input.files[0];
+    input.value = "";
+    if (!f) return;
+    const fd = new FormData();
+    fd.append("file", f, f.name || "муфта.jpg");
+    btn.disabled = true;
+    toast("Читаю координаты с фото…");
+    try {
+      const r = await api("/api/photos/closure", { method: "POST", body: fd });
+      await reload();
+      openObject("closure", r.closure_id);
+      const src = r.source === "exif" ? "из данных фото" : "по подписи на кадре";
+      toast(`${r.message}. Координаты ${src}` + (r.accuracy_m ? `, точность ± ${Math.round(r.accuracy_m)} м` : "") + ".");
+    } catch (e) {
+      toast(e.message);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+}

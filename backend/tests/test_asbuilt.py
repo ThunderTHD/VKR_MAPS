@@ -23,7 +23,7 @@ from app.services import splicing
 from app.services.asbuilt import apply, parser
 from app.services.editing import EditError
 from app.services.generator import reset_network
-from tests.asbuilt_factory import POLES, font_path, sample_pdf
+from tests.asbuilt_factory import POLES, font_path, sample_docx, sample_pdf
 from tests.test_localization import _build
 
 pytestmark = pytest.mark.skipif(font_path() is None, reason="нет шрифта DejaVuSans для синтетического PDF")
@@ -163,8 +163,87 @@ def test_poles_reuse_existing_points(db, net):
 
 
 def test_upload_rejects_non_pdf(db):
-    with pytest.raises(EditError, match="не PDF"):
+    with pytest.raises(EditError, match="не PDF и не Word"):
         apply.create_package(db, "x.pdf", b"<html>", None)
+    with pytest.raises(EditError, match="не PDF и не Word"):
+        apply.create_package(db, "x.docx", b"PK\x03\x04 not a zip", None)
+
+
+# ------------------------------------------------------------------ Word (.docx) и рассветка
+
+
+def test_docx_same_as_pdf(parsed):
+    """Тот же пакет в Word разбирается в те же данные и находит те же замечания."""
+    d = parser.parse_docx(sample_docx(), ocr=parser.ocr_available())
+    assert d["summary"]["format"] == "docx"
+    assert [p["kind"] for p in d["pages"]] == [p["kind"] for p in parsed["pages"]]
+    for k in ("summary", "extracted", "trace"):
+        a, b = (dict(x) if isinstance(x, dict) else x for x in (parsed[k], d[k]))
+        if k == "summary":
+            b.pop("format")
+        if k == "extracted":   # распознанный OCR номер свидетельства зависит от масштаба картинки
+            a.pop("calibration", None)
+            assert b.pop("calibration", {}).get("valid_until") == parsed[k].get("calibration", {}).get("valid_until")
+        assert a == b, k
+    assert sorted(f["code"] for f in d["findings"]) == sorted(f["code"] for f in parsed["findings"])
+
+
+def test_splice_groups_from_protocols(parsed):
+    groups = apply.splice_groups(parsed)
+    clo = next(g for g in groups if g["kind"] == "closure_protocol")
+    assert clo["cable_a"].startswith("ОКЛ-8") and clo["cable_b"].startswith("ОКГ-8")
+    assert [(r["fiber_a"], r["fiber_b"]) for r in clo["rows"]] == [(2, 1), (3, 2)]
+    assert clo["rows"][0]["loss_db"] == pytest.approx(0.02)
+    assert apply._mark_key("ОКГ-8 (G.652.D)-T/П 3,0") == "ОКГ-8"
+    assert apply._mark_key("ДПО-П-08У (2х4)-300Н") == "ДПО-П-08"
+
+
+@pytest.fixture()
+def splice_net(db, net):
+    """Муфта М1 в B: из неё выходит кабель Y (ОКГ-8, «новый» из пакета), в неё приходит Z (ОКЛ-8)."""
+    from app.models import CableType
+    from app.services import routing
+    okg = db.scalar(sa.select(CableType).where(CableType.mark.like("ОКГ-8%")))
+    okl = db.scalar(sa.select(CableType).where(CableType.mark.like("ОКЛ-8%")))
+    y = net["y"]
+    y.cable_type_id = okg.id
+    z = routing.create_cable(db, name="Z", operator_id=y.operator_id, cable_type_id=okl.id,
+                             waypoints=[net["n"]["A"].id, net["n"]["B"].id])
+    clo = splicing.create_closure(db, node_id=net["n"]["B"].id, number="М1")
+    pkg = apply.create_package(db, "ИД.docx", sample_docx(scan=False), None)
+    pkg.parse_result = parser.parse_docx(sample_docx(scan=False), ocr=False)
+    pkg.status = PackageStatus.parsed
+    db.flush()
+    db.expire_all()
+    return {**net, "z": z, "closure": clo, "pkg": pkg}
+
+
+def test_splice_plan_and_confirm(db, splice_net):
+    n = splice_net
+    plan = apply.splice_plan(db, n["pkg"], n["y"].id)
+    g = next(x for x in plan if x["kind"] == "closure_protocol")
+    assert g["closure_id"] == n["closure"].id and g["cable_a_id"] == n["z"].id and g["cable_b_id"] == n["y"].id
+    choice = [{"group": g["group"], "closure_id": g["closure_id"], "cable_a_id": g["cable_a_id"],
+               "cable_b_id": g["cable_b_id"]}]
+    done = apply.confirm(db, n["pkg"], cable_id=n["y"].id, port_a_id=None, port_b_id=None, measurement=False,
+                         access_node=False, splices=choice)
+    assert done["splices"] == {"created": 2, "already": 0}
+    sheet = splicing.closure_sheet(db, db.get(splicing.Closure, n["closure"].id))
+    pairs = sorted((s["a"]["fiber"], s["b"]["fiber"]) for s in sheet["splices"])
+    assert pairs in ([(1, 2), (2, 3)], [(2, 1), (3, 2)])
+    assert all(s["loss_db"] is not None for s in sheet["splices"])
+
+
+def test_splice_write_errors(db, splice_net):
+    n = splice_net
+    with pytest.raises(EditError, match="выберите муфту"):
+        apply.confirm(db, n["pkg"], cable_id=n["y"].id, port_a_id=None, port_b_id=None, measurement=False,
+                      access_node=False, splices=[{"group": 0, "closure_id": None}])
+    # Повторная запись тех же сварок не дублирует их
+    g = next(x for x in apply.splice_plan(db, n["pkg"], n["y"].id) if x["kind"] == "closure_protocol")
+    ch = {k: g[k] for k in ("group", "closure_id", "cable_a_id", "cable_b_id")}
+    assert apply._write_splices(db, n["pkg"], [ch], None) == {"created": 2, "already": 0}
+    assert apply._write_splices(db, n["pkg"], [ch], None) == {"created": 0, "already": 2}
 
 
 # ------------------------------------------------------------------ API
@@ -216,3 +295,17 @@ def test_api_upload_process_and_reject(api_users, sample_file):
         assert s.get(AsBuiltPackage, pid).status == PackageStatus.rejected
     r = c.post("/api/asbuilt", headers=H, files={"file": ("a.pdf", b"not a pdf", "application/pdf")})
     assert r.status_code == 409
+    # Тот же пакет в Word
+    files = {"file": ("ИД.docx", sample_docx(scan=False), "application/octet-stream")}
+    r = c.post("/api/asbuilt", headers=H, files=files, data={"ocr": "false"})
+    assert r.status_code == 200
+    pid = r.json()["id"]
+    for _ in range(60):
+        body = c.get(f"/api/asbuilt/{pid}").json()
+        if body["status"] != "processing":
+            break
+        time.sleep(0.5)
+    assert body["status"] == "parsed", body.get("error")
+    assert body["summary"]["format"] == "docx" and body["suggest"]["measurement"]["optical_m"] == 2540
+    plan = c.get(f"/api/asbuilt/{pid}/splice-plan").json()
+    assert {g["kind"] for g in plan} == {"closure_protocol"}

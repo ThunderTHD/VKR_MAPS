@@ -4,7 +4,7 @@ import { renderCard } from "./card.js";
 import { DrawTools } from "./draw.js";
 import { Editor } from "./edit.js";
 import { LAYER_INFO, MapLayers } from "./layers.js";
-import { FieldTools } from "./field.js";
+import { FieldTools, setupClosurePhoto } from "./field.js";
 import { ImpactTool } from "./impact.js";
 import { LocateTool } from "./locate.js";
 
@@ -227,7 +227,7 @@ function toast(text) {
   t.textContent = text;
   t.hidden = false;
   clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => (t.hidden = true), 4000);
+  toast.timer = setTimeout(() => (t.hidden = true), Math.max(4000, text.length * 60));
 }
 
 function togglePanel(id, btn) {
@@ -308,6 +308,7 @@ async function main() {
     openObject: (type, id) => openObject(type, id),
     reopen: (type, id) => openObject(type, id, { fly: false }) });
   editor.ctx.field = new FieldTools({ map, toast, closeCard, openObject: (type, id) => openObject(type, id) });
+  setupClosurePhoto({ user, toast, reload: loadLayers, openObject: (type, id) => openObject(type, id) });
   window.vols = { map, layers, draw }; // для отладки из консоли браузера и проверок интерфейса
   fillSelect($("filter-operator"), ref.operators);
   fillSelect($("filter-owner"), ref.owners);

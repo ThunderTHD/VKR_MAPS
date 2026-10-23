@@ -8,6 +8,7 @@
   4. по протоколам собирается трасса волокна.
 Результат — словарь, который хранится в asbuilt_package.parse_result.
 """
+import io
 import math
 import re
 from collections import Counter, defaultdict
@@ -163,6 +164,8 @@ def ex_act_pnr(page, text):
     for t in page.extract_tables():
         for row in t:
             first = (row[0] or "").strip()
+            if not d.get("address") and first.startswith("на адрес") and len(row) > 1 and row[1]:
+                d["address"] = flat(row[1])          # Word: адрес — в ячейке таблицы
             if first.startswith("Устанавливаемое") or first.startswith("Вышестоящее"):
                 key = "device" if first.startswith("Устанавливаемое") else "uplink"
                 ep = parse_endpoint(row[1])
@@ -219,7 +222,7 @@ def ex_skeleton(page, text):
 def ex_route_scheme(page, text):
     f = flat(text)
     d = {"span_labels_m": [num(x) for x in re.findall(r"-\s*(\d+,\d)\s*-", text)]}
-    m = re.search(r"(\d+)м\s+ПАО", text)
+    m = re.search(r"(\d+)м\s+ПАО", text) or re.search(r"(?:ОКГ|ОКЛ|ДПО|ДПС|ОКБ)[^\n]*\n\s*(\d+)\s*м\b", text)
     d["cable_label_m"] = num(m[1]) if m else None
     vol = {}
     for label, key in [(r"по\s+опорам", "aerial"), (r"по\s+зданию", "building"),
@@ -237,6 +240,9 @@ def ex_splice_scheme(page, text):
     # поэтому ищем марки в развёрнутом тексте страницы.
     rev = text[::-1].replace("\n", "")
     d["cables"] = re.findall(r"((?:ДПО|ДПС|ДПТ|ОКЛ|ОКГ|ОКБ)-[\w().,/ -]+?);", rev)
+    if not d["cables"]:   # Word: надписи хранятся неповёрнутыми
+        d["cables"] = sorted({c.replace(" ", "") for c in
+                              re.findall(r"((?:ДПО|ДПС|ДПТ|ОКЛ|ОКГ|ОКБ)-[\w().,/ -]+?);", text)})
     joined = re.sub(r"-\n", "-", text)
     d["access_nodes"] = sorted(set(re.findall(r"УД\s*(\d{2}[A-Z]{3,}-[A-Z0-9]+-\d+)", joined)))
     d["closures"] = sorted(set(re.findall(r"Муфта\s+(М\d+)", text)))
@@ -746,28 +752,84 @@ def _majority(pages, field):
 
 def parse_pdf(path, ocr: bool = True, progress=None) -> dict:
     """Разобрать PDF. progress(сделано, всего, что) — для отображения хода обработки."""
-    pages = []
     with pdfplumber.open(path) as pdf:
+        raw = []
         total = len(pdf.pages)
         for i, page in enumerate(pdf.pages, 1):
-            text = page.extract_text() or ""
-            meaningful = len(re.findall(r"[А-Яа-яA-Za-z]{3,}", text))
-            kind = classify(text) if meaningful >= 5 else "empty"
-            data = {}
-            if kind in EXTRACTORS:
-                try:
-                    data = EXTRACTORS[kind](page, text)
-                except Exception as e:  # noqa: BLE001 — страница с неожиданной разметкой не должна ронять разбор
-                    data = {"error": f"не удалось извлечь данные: {e!r}"}
-            pages.append({"page": i, "kind": kind, "has_text": kind != "empty",
-                          "header": header_fields(text), "data": data})
-            if progress:
+            raw.append((page, page.extract_text() or ""))
+            if progress and i % 5 == 0:
                 progress(i, total, "текст")
+        return _analyze(raw, (lambda n: ocr_pages(path, [n])[n]) if ocr else None, progress)
+
+
+def parse_docx(path_or_bytes, ocr: bool = True, progress=None) -> dict:
+    """Разобрать тот же пакет ИД в формате Word: «страницы» — фрагменты между разрывами.
+
+    Фрагмент, который не начинается с заголовка известного документа, — продолжение
+    предыдущего (схемы и акты в Word часто разбиты на несколько разделов). Отдельными
+    страницами остаются сканы — картинки без текста (свидетельства о поверке).
+    """
+    from app.services.asbuilt.docx_pages import read_pages
+    frags, images = read_pages(path_or_bytes)
+    merged: list[tuple] = []          # (страница, текст, картинки)
+    for fr in frags:
+        text = fr.text
+        meaningful = len(re.findall(r"[А-Яа-яA-Za-z]{3,}", text))
+        kind = classify(text) if meaningful >= 5 else "empty"
+        big = [i for i in fr.image_ids if len(images.get(i, b"")) > SCAN_MIN_BYTES]
+        scan = kind == "empty" and bool(big)
+        starts = kind not in ("unknown", "empty") or scan
+        if merged and not starts and not merged[-1][3]:
+            page, prev_text, imgs, _ = merged[-1]
+            page.tables += fr.tables
+            merged[-1] = (page, prev_text + "\n" + text, imgs, False)
+        else:
+            merged.append((fr, text, big, scan))
+    scans = {i: m[2] for i, m in enumerate(merged, 1) if m[3]}
+
+    def ocr_docx(n):
+        import pytesseract
+        from PIL import Image
+        for rid in sorted(scans.get(n, []), key=lambda r: -len(images[r])):
+            try:
+                img = Image.open(io.BytesIO(images[rid])).convert("L")
+            except Exception:  # noqa: BLE001 — EMF/WMF и прочее, что Pillow не открывает
+                continue
+            if img.width < 1200:
+                img = img.resize((img.width * 2, img.height * 2))
+            text = pytesseract.image_to_string(img, lang="rus")
+            valid = ocr_valid_until(img, text, pytesseract) if re.search(r"ПОВЕРКЕ", text) else None
+            return text, valid
+        return "", None
+
+    raw = [(m[0], "" if m[3] else m[1]) for m in merged]
+    res = _analyze(raw, ocr_docx if ocr else None, progress)
+    res["summary"]["format"] = "docx"
+    return res
+
+
+SCAN_MIN_BYTES = 20_000   # меньше — логотипы и значки, а не сканы
+
+
+def _analyze(raw, ocr_fn, progress=None) -> dict:
+    """Общая часть разбора: raw — [(страница с extract_tables(), текст)], ocr_fn(n) → (текст, срок)."""
+    pages = []
+    for i, (page, text) in enumerate(raw, 1):
+        meaningful = len(re.findall(r"[А-Яа-яA-Za-z]{3,}", text))
+        kind = classify(text) if meaningful >= 5 else "empty"
+        data = {}
+        if kind in EXTRACTORS:
+            try:
+                data = EXTRACTORS[kind](page, text)
+            except Exception as e:  # noqa: BLE001 — страница с неожиданной разметкой не должна ронять разбор
+                data = {"error": f"не удалось извлечь данные: {e!r}"}
+        pages.append({"page": i, "kind": kind, "has_text": kind != "empty",
+                      "header": header_fields(text), "data": data})
     ocr_res = {}
     scans = [p["page"] for p in pages if p["kind"] == "empty"]
-    if ocr and scans and ocr_available():
+    if ocr_fn and scans and ocr_available():
         for k, n in enumerate(scans, 1):
-            ocr_res.update(ocr_pages(path, [n]))
+            ocr_res[n] = ocr_fn(n)
             if progress:
                 progress(k, len(scans), "распознавание сканов")
         for p in pages:
@@ -796,7 +858,7 @@ def parse_pdf(path, ocr: bool = True, progress=None) -> dict:
     summary = {
         "volp": _majority(pages, "volp"), "address": _majority(pages, "address"),
         "client_code": _majority(pages, "client_code"),
-        "contractor": _contractor(path) or None,
+        "contractor": _contractor([t for _, t in raw[:12]]),
         "doc_date": str(parse_date(lp.get("date"))) if parse_date(lp.get("date")) else None,
         "pages": len(pages), "scans": len(scans), "ocr_pages": len(ocr_res),
         "errors": sum(f["level"] == "error" for f in findings),
@@ -806,13 +868,12 @@ def parse_pdf(path, ocr: bool = True, progress=None) -> dict:
             "extracted": {k: v["data"] for k, v in ex.items() if v.get("data")}}
 
 
-def _contractor(path) -> str | None:
-    with pdfplumber.open(path) as pdf:
-        for page in pdf.pages[:12]:
-            m = re.search(r"(?:Подрядная|Строительно-монтажная)\s+организация:?\s*(ООО|АО|ПАО|ИП)\s*"
-                          r"[«\"]([^»\"]+)[»\"]", flat(page.extract_text() or ""))
-            if m:
-                return f"{m[1]} «{m[2]}»"
+def _contractor(texts) -> str | None:
+    for text in texts:
+        m = re.search(r"(?:Подрядная|Строительно-монтажная)\s+организация:?\s*(ООО|АО|ПАО|ИП)\s*"
+                      r"[«\"]([^»\"]+)[»\"]", flat(text))
+        if m:
+            return f"{m[1]} «{m[2]}»"
     return None
 
 

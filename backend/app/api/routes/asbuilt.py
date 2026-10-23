@@ -22,6 +22,13 @@ class LinkIn(BaseModel):
     port_b_id: int | None = None
 
 
+class SpliceChoice(BaseModel):
+    group: int
+    closure_id: int | None = None
+    cable_a_id: int | None = None
+    cable_b_id: int | None = None
+
+
 class ConfirmIn(LinkIn):
     measurement: bool = True
     twist: bool = True
@@ -29,6 +36,7 @@ class ConfirmIn(LinkIn):
     access_node: bool = True
     poles: bool = False
     attach: bool = True
+    splices: list[SpliceChoice] | None = None
 
 
 class RejectIn(BaseModel):
@@ -43,7 +51,7 @@ def list_packages(db: Session = Depends(get_db)) -> list[dict]:
     return [apply.package_summary(p) for p in rows]
 
 
-@router.post("/asbuilt", summary="Загрузить пакет ИД (PDF) — разбор идёт в фоне")
+@router.post("/asbuilt", summary="Загрузить пакет ИД (PDF или Word .docx) — разбор идёт в фоне")
 async def upload(file: UploadFile = File(...), ocr: bool = Form(True), db: Session = Depends(get_db),
                  user: AppUser = Depends(admin_only)) -> dict:
     data = await file.read(apply.MAX_BYTES + 1)
@@ -72,6 +80,12 @@ def compare(pkg_id: int, data: LinkIn, db: Session = Depends(get_db)) -> list[di
         return apply.compare(db, _get(db, AsBuiltPackage, pkg_id), data.cable_id, data.port_a_id, data.port_b_id)
     except EditError as exc:
         raise HTTPException(409, str(exc)) from None
+
+
+@router.get("/asbuilt/{pkg_id}/splice-plan", summary="Сварки из протоколов: куда их записать (муфта, кабели)",
+            dependencies=[Depends(installer_or_admin)])
+def splice_plan(pkg_id: int, cable_id: int | None = None, db: Session = Depends(get_db)) -> list[dict]:
+    return apply.splice_plan(db, _get(db, AsBuiltPackage, pkg_id), cable_id)
 
 
 @router.post("/asbuilt/{pkg_id}/confirm", summary="Подтвердить пакет: записать данные в сеть")
