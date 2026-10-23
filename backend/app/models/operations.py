@@ -194,3 +194,20 @@ class SimTruth(Base):
     entity_id: Mapped[int] = mapped_column(sa.Integer)
     attribute: Mapped[str] = mapped_column(sa.String(40))
     value: Mapped[float] = mapped_column(sa.Float)
+
+
+class ExperimentRun(Base):
+    """Прогон эксперимента для ВКР (этап 12): считается в отдельной базе, здесь — только результаты."""
+
+    __tablename__ = "experiment_run"
+    __table_args__ = (sa.CheckConstraint("status IN ('running', 'done', 'failed')", name="status"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), server_default=sa.func.now())
+    finished_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    suite: Mapped[str] = mapped_column(sa.String(20))
+    status: Mapped[str] = mapped_column(sa.String(12), default="running")
+    progress = mapped_column(JSONB, nullable=True)
+    results = mapped_column(JSONB, nullable=True)
+    error: Mapped[str | None] = mapped_column(sa.Text)
+    started_by: Mapped[int | None] = mapped_column(sa.ForeignKey("app_user.id", ondelete="SET NULL"))

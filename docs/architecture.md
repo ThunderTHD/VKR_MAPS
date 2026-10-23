@@ -94,6 +94,7 @@ flowchart TB
 | `services/impact` | пути узлов доступа, «что отключится», корреляция аварий → место обрыва | 11 |
 | `services/photo_coords`, `photo_points` | EXIF и OCR координат с фото, точки сети по фото | 11 |
 | `services/export` | выгрузка сети в KML и GeoJSON | 11 |
+| `services/evaluation` | эксперимент для ВКР: серии E1–E5 в отдельной базе, отчёт, CSV | 12 |
 | `services/anonymize`, `tools/generate` | обезличивание реальных данных, генератор сети | 2, 12 |
 
 ## 3. Ключевые потоки данных

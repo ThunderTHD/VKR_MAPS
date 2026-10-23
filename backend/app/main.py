@@ -14,6 +14,7 @@ from app.api.routes import (
     auth,
     drawing,
     edit,
+    experiments,
     health,
     imports,
     incidents,
@@ -66,6 +67,7 @@ def create_app() -> FastAPI:
     app.include_router(asbuilt.router, prefix="/api")
     app.include_router(monitoring.router, prefix="/api")
     app.include_router(photos.router, prefix="/api")
+    app.include_router(experiments.router, prefix="/api")
 
     # Статику подключаем последней: маршрут "/" не должен перекрывать /api
     if s.frontend_dir.is_dir():

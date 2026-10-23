@@ -53,6 +53,11 @@ TAU_START = 0.05         # начальная оценка разброса по
 # Нижняя граница разброса: даже после поправки длина «по карте» не точнее ±4 % (2σ) —
 # оценка по остаткам при малом числе наблюдений бывает занижена до нуля
 TAU_MIN = 0.02
+# Оценка разброса по малому числу наблюдений ненадёжна (эксперимент этапа 12: при 3 повреждениях
+# интервал занижался и истина попадала в него лишь в 70 % случаев). Поэтому τ «стягивается» к
+# априорному значению (25 % — 2σ длины по карте) с весом, равным TAU_PRIOR_N наблюдениям.
+TAU_PRIOR = 0.125
+TAU_PRIOR_N = 8
 INFORMATIVE = 0.75       # предлагать укрутку, если её σ уменьшилась хотя бы до 75 % априорной
 MIN_OBS = 3
 
@@ -199,6 +204,8 @@ def fit(obs: list[Obs], k0: dict[int, float], iterations: int = 8) -> Fit:
             excess = float(np.sum(resid ** 2 - np.array([o.var_fixed for o in obs])))
             tau = math.sqrt(max(excess, 0.0) / sum(o.geom_sq for o in obs)) if excess > 0 else TAU_MIN
             tau = min(max(tau, TAU_MIN), 0.15)
+            n_map = sum(1 for o in obs if o.geom_sq > 0)
+            tau = math.sqrt((n_map * tau ** 2 + TAU_PRIOR_N * TAU_PRIOR ** 2) / (n_map + TAU_PRIOR_N))
     sd = np.sqrt(np.diag(cov))
     n_obs = {c: sum(1 for o in obs if c in o.known or c in o.geom) for c in cables}
     return Fit(float(theta[0]), float(sd[0]), {c: float(theta[idx[c]]) for c in cables},

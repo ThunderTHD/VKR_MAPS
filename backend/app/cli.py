@@ -14,6 +14,7 @@ import sys
 
 import sqlalchemy as sa
 
+from app.core.config import get_settings
 from app.core.db import SessionLocal
 from app.core.security import hash_password
 from app.models import AppUser, Role
@@ -113,6 +114,37 @@ def cmd_localize_experiment(args: argparse.Namespace) -> None:
     print(experiment.sigma_check(res))
 
 
+def cmd_experiment(args: argparse.Namespace) -> None:
+    """Эксперимент для ВКР (этап 12) в отдельной базе; результат — в журнал прогонов и в Markdown."""
+    import json
+    import time
+    from datetime import UTC, datetime
+
+    from app.models import ExperimentRun
+    from app.services import evaluation
+
+    t0 = time.time()
+    only = args.only.split(",") if args.only else None
+
+    def progress(stage: str, frac: float) -> None:
+        print(f"{time.time() - t0:7.0f} с  {frac * 100:5.1f} %  {stage}", flush=True)
+
+    res = evaluation.run_isolated(get_settings().database_url, args.suite, only, progress)
+    with SessionLocal() as db:
+        run = ExperimentRun(suite=args.suite, status="done", results=res, progress={"stage": "готово", "frac": 1.0},
+                            finished_at=datetime.now(UTC))
+        db.add(run)
+        db.commit()
+        print(f"Прогон №{run.id} сохранён (страница «Эксперимент»)")
+    md = evaluation.to_markdown(res)
+    if args.out:
+        with open(args.out, "w", encoding="utf-8") as f:
+            f.write(md)
+        with open(args.out.rsplit(".", 1)[0] + ".json", "w", encoding="utf-8") as f:
+            json.dump(res, f, ensure_ascii=False, indent=1)
+    print(md)
+
+
 def cmd_simulate_incidents(args: argparse.Namespace) -> None:
     """Устранённые повреждения на сгенерированной сети — для демонстрации журнала и калибровки."""
     from app.services import experiment, incidents
@@ -184,6 +216,12 @@ def main(argv: list[str] | None = None) -> None:
     e.add_argument("--n", type=int, default=300, help="сколько повреждений смоделировать")
     e.add_argument("--seed", type=int, default=1)
     e.set_defaults(func=cmd_localize_experiment)
+
+    ex = sub.add_parser("experiment", help="эксперимент для ВКР (этап 12) в отдельной базе")
+    ex.add_argument("--suite", choices=["quick", "full"], default="quick")
+    ex.add_argument("--only", help="серии через запятую: e1,e2,e3,e4,e5")
+    ex.add_argument("--out", help="записать отчёт Markdown (и JSON рядом)")
+    ex.set_defaults(func=cmd_experiment)
 
     si = sub.add_parser("simulate-incidents", help="смоделировать устранённые повреждения (тестовая сеть)")
     si.add_argument("--n", type=int, default=40)

@@ -726,3 +726,25 @@ button.near-item:hover { background: var(--surface-2); }
   .photo-table td:last-child { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; }
   .photo-table select, .photo-table input { max-width: none; flex: 1 1 160px; }
 }
+
+/* ---------- Этап 12: графики эксперимента ---------- */
+.viz { display: grid; gap: 16px;
+  --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a; --series-4: #eda100; }
+@media (prefers-color-scheme: dark) {
+  .viz { --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500; }
+}
+.chart-fig { margin: 12px 0 16px; }
+.chart-fig figcaption { font-weight: 600; margin-bottom: 6px; }
+.chart { width: 100%; height: auto; display: block; min-width: 620px; }
+.chart-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .axis { stroke: var(--muted); stroke-width: 1; }
+.chart .tick { fill: var(--muted); font-size: 11px; }
+.chart .val { fill: var(--fg); font-size: 11px; font-variant-numeric: tabular-nums; }
+.chart .bar path { stroke: var(--surface); stroke-width: 2px; paint-order: stroke; }
+.chart .bar:hover path { opacity: 0.85; }
+.chart .ring { stroke: var(--surface); stroke-width: 2px; }
+.viz-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+.viz-key { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.viz-key i { flex: none; width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.viz, .viz > * { min-width: 0; }

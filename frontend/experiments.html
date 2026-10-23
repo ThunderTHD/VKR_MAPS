@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Эксперимент — ГИС ВОЛС</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body class="splice-page">
+  <header class="splice-head">
+    <a href="/" class="brand" title="К карте"><span class="brand-mark" aria-hidden="true"></span><span class="brand-text">ГИС ВОЛС</span></a>
+    <div class="splice-title"><h1>Эксперимент для ВКР</h1>
+      <div class="muted small">Точность и скорость системы на сгенерированных сетях с известной «правдой»</div></div>
+    <div class="splice-tools"><a class="btn btn-small" href="/">Карта</a></div>
+  </header>
+  <main class="page-wide">
+    <section class="page-card">
+      <p>Опыты идут в <b>отдельной базе</b> (рабочая сеть не меняется): генерируются сети, на них моделируются
+        повреждения и обрывы, ответы системы сравниваются с правдой. Быстрый набор — около 3 минут,
+        полный (3 сети, 200 повреждений на сеть, сети до 1200 точек) — 10–30 минут.</p>
+      <div class="toolbar">
+        <button id="btn-quick" class="btn btn-small" type="button">Запустить быстрый</button>
+        <button id="btn-full" class="btn btn-small btn-primary" type="button">Запустить полный</button>
+        <label class="field inline">Прогон <select id="runs"></select></label>
+      </div>
+      <div id="progress" hidden>
+        <p id="progress-text" class="muted"></p>
+        <div class="progress"><div id="progress-bar"></div></div>
+      </div>
+    </section>
+    <div id="results" class="viz"></div>
+  </main>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script type="module" src="js/experiments.js"></script>
+</body>
+</html>

@@ -17,6 +17,7 @@ from app.models.network import NetworkNode, NodeKind, RouteSegment, SegmentKind
 from app.models.operations import (
     AccessNode,
     CalibrationRun,
+    ExperimentRun,
     Incident,
     IncidentStatus,
     Instrument,
@@ -49,7 +50,8 @@ from app.models.system import (
 __all__ = [
     "AccessNode", "AppUser", "AsBuiltPackage", "AuditLog", "Base", "Cable", "CableReserve", "CableRoute",
     "CableType", "CalibrationRun", "Closure", "ColorKind", "ColorScheme", "ColorSchemeEntry", "CrossPort",
-    "Document", "DocumentKind", "Fiber", "FiberEnd", "FolderTarget", "ImportJob", "ImportKind", "ImportStatus",
+    "Document", "DocumentKind", "ExperimentRun", "Fiber", "FiberEnd", "FolderTarget", "ImportJob", "ImportKind",
+    "ImportStatus",
     "Incident", "IncidentStatus", "Instrument", "InstrumentKind", "Jumper", "KmlFolderRule", "LengthSource",
     "LengthSourceCode", "MapOverlay", "Measurement", "MeasurementKind", "NetworkNode", "NodeKind", "NodeStatus",
     "NodeStatusHistory", "OpticalCross", "Operator", "Owner", "PackageStatus", "Role", "RouteSegment",

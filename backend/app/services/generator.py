@@ -83,6 +83,9 @@ class GeneratorParams:
     drop_share: float = 0.15         # доля пролётов канализации, которых «нет»
     buildings_per_operator: int = 10
     measured_share: float = 0.6      # доля трактов с измерением «из ИД» (эталон для калибровки)
+    # Откуда известны длины участков: {"reflectometer": 0.1, ..., "geometry": 0.3}; None — как в жизни
+    # (LENGTH_SOURCE_MIX). «geometry» — длины нет, только нарисованная линия. Для эксперимента этапа 12.
+    length_mix: dict[str, float] | None = None
 
 
 @dataclass
@@ -158,7 +161,9 @@ class NetworkGenerator:
 
     def _pick_source(self) -> LengthSourceCode | None:
         r, acc = self.rnd.random(), 0.0
-        for src, share in LENGTH_SOURCE_MIX:
+        mix = LENGTH_SOURCE_MIX if self.p.length_mix is None else [
+            (None if k == "geometry" else LengthSourceCode(k), v) for k, v in self.p.length_mix.items()]
+        for src, share in mix:
             acc += share
             if r < acc:
                 return src

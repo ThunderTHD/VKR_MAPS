@@ -246,6 +246,7 @@ function setupUi(user) {
   if (user.role === "admin") {
     $("menu-import").hidden = false;
     $("menu-calibration").hidden = false;
+    $("menu-experiments").hidden = false;
     $("menu-export-kml").hidden = false;
     $("menu-export-geojson").hidden = false;
   }

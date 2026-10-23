@@ -16,7 +16,6 @@ from sqlalchemy.orm import Session
 
 from app.models import Closure, DocumentKind, NetworkNode, NodeKind, RouteSegment
 from app.services import drawing, photo_coords, splicing
-from app.services.cards import NODE_KIND_RU
 from app.services.editing import EditError, audit
 from app.services.kml.jobs import store_upload
 
