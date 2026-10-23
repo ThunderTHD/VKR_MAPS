@@ -4,9 +4,10 @@ FROM python:3.12-slim
 
 # tesseract-ocr-rus — распознавание сканов ИД и фото с координатами;
 # fping — параллельный ICMP-опрос узлов доступа (используется на сервере компании);
-# curl — проверка здоровья контейнера.
+# curl — проверка здоровья контейнера;
+# fonts-dejavu-core — шрифт с кириллицей для демонстрационных файлов (python -m app.cli demo-files).
 RUN apt-get update \
- && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-rus fping curl \
+ && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-rus fping curl fonts-dejavu-core \
  && rm -rf /var/lib/apt/lists/*
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

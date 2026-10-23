@@ -191,6 +191,17 @@ def cmd_stats(_: argparse.Namespace) -> None:
             print(f"  {key:<24} {value}")
 
 
+def cmd_demo_files(args: argparse.Namespace) -> None:
+    from pathlib import Path
+
+    from app.services import demo_files
+    with SessionLocal() as db:
+        notes = demo_files.build(db, Path(args.out))
+    print(f"Файлы для демонстрации записаны в {args.out}:")
+    for n in notes:
+        print("  " + n)
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="python -m app.cli", description="Обслуживание ГИС ВОЛС")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -232,6 +243,10 @@ def main(argv: list[str] | None = None) -> None:
     ca.add_argument("--apply", action="store_true", help="сразу применить")
     ca.add_argument("--no-simulation", action="store_true", help="не проверять на смоделированных повреждениях")
     ca.set_defaults(func=cmd_calibrate)
+
+    df = sub.add_parser("demo-files", help="фото, план и Shapefile для демонстрации — по текущей сети")
+    df.add_argument("--out", default="/data/uploads/demo", help="папка для файлов")
+    df.set_defaults(func=cmd_demo_files)
 
     k = sub.add_parser("import-kml", help="импорт KML/KMZ")
     k.add_argument("files", nargs="+")

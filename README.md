@@ -272,6 +272,7 @@ docker compose exec app python -m app.cli stats                   :: сколь�
 docker compose exec app python -m app.cli clear-generated         :: удалить только тестовую сеть
 docker compose exec app python -m app.cli generate --seed 7       :: другая тестовая сеть
 docker compose exec app python -m app.cli create-user ivanov Пароль123 --role installer --name "Иванов И.И."
+docker compose exec app python -m app.cli demo-files --out /tmp/demo   :: файлы для показа по текущей сети
 ```
 
 ### Если что-то не так
@@ -298,7 +299,7 @@ VKR_MAPS/
 │   └── tests/            автотесты (pytest, на настоящем PostGIS)
 ├── frontend/             интерфейс (HTML, JavaScript, Leaflet)
 ├── tools/                скрипты: генератор данных, обезличивание, прототипы
-├── data/samples/         обезличенные примеры данных
+├── data/samples/         обезличенные примеры данных и файлы для демонстрации (demo/)
 ├── docs/                 архитектура, модель данных, решения, заметки для ВКР
 ├── docker-compose.yml    запуск всей системы
 ├── start.bat / stop.bat  запуск и остановка на Windows
@@ -311,6 +312,9 @@ VKR_MAPS/
 
 ## Документация
 
+- **[Быстрый старт](docs/guide/quick-start.md)** — как пользоваться системой: запуск, вход, основные задачи
+- **[Руководство пользователя](docs/guide/user-guide.md)** — все функции по порядку, права ролей, решение проблем
+- **[Демонстрационные сценарии](docs/guide/demo-scenarios.md)** — как показать систему, что говорить, чего ожидать
 - [Архитектура](docs/architecture.md) — компоненты, слои, потоки данных, развёртывание
 - [Модель данных](docs/er.md) — ER-диаграммы и пояснения
 - [Архитектурные решения](docs/decisions.md) — что выбрано и почему

@@ -48,6 +48,20 @@ async function networkBackground() {
   const seg = await api("/api/map/layers/segments");
   L.geoJSON(typeof seg === "string" ? JSON.parse(seg) : seg, { style: { color: "#2a78d6", weight: 2, opacity: 0.7 },
     interactive: false }).addTo(geoMap);
+  // Колодцы и другие точки сети: подсказка с кодом, щелчок ставит опорную точку точно в центр колодца
+  const nodes = await api("/api/map/layers/nodes");
+  L.geoJSON(typeof nodes === "string" ? JSON.parse(nodes) : nodes, {
+    pointToLayer: (f, ll) => {
+      const m = L.circleMarker(ll, { radius: 4, color: "#14213d", weight: 1.5, fillColor: "#fff", fillOpacity: 1 });
+      const label = f.properties.code || f.properties.name;
+      if (label) m.bindTooltip(label, { direction: "top", offset: [0, -4] });
+      m.on("click", (e) => {
+        L.DomEvent.stop(e);
+        setGeo(ll);
+      });
+      return m;
+    },
+  }).addTo(geoMap);
 }
 
 function step() {
@@ -115,18 +129,19 @@ imgMap.on("click", (e) => {
   else points.push({ px: e.latlng.lng, py: -e.latlng.lat });
   render();
 });
-geoMap.on("click", (e) => {
+function setGeo(latlng) {
   const last = points[points.length - 1];
   if (!last) {
     toast("Сначала отметьте точку на плане (слева)");
     return;
   }
-  const ll = e.latlng.wrap();
+  const ll = L.latLng(latlng).wrap();
   last.lon = ll.lng;
   last.lat = ll.lat;
   delete last.residual;
   render();
-});
+}
+geoMap.on("click", (e) => setGeo(e.latlng));
 $("btn-undo").addEventListener("click", () => { points.pop(); render(); });
 $("preview-opacity").addEventListener("input", () => preview?.setOpacity(Number($("preview-opacity").value)));
 $("btn-save").addEventListener("click", async () => {
